@@ -1,4 +1,4 @@
-<p align="center"><img src="image/logo.png" alt="pyGeoMapper" width="240"></p>
+<p align="center"><img src="image/logo.png" alt="pyGeoMapper" width="200"></p>
 
 # pyGeoMapper
 

@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/logo.png" alt="pyGeoMapper" width="240"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/logo.png" alt="pyGeoMapper" width="200"></p>
 
 # pyGeoMapper
 
