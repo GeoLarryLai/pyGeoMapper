@@ -110,7 +110,7 @@ def test_supervised_and_unsupervised_auto_mapping_on_sheep_mtn() -> None:
     )
     metrics_full = auto_mapping.evaluate_mapping_accuracy(geol, res["pred_labels"])
     if not auto_mapping.HAS_SKLEARN:
-        pytest.skip("accuracy thresholds need the random forest (pip install 'pygeomapper[ml]')")
+        pytest.skip("accuracy thresholds need the random forest (pip install scikit-learn)")
     assert metrics_test["overall_accuracy"] > 0.60
     assert metrics_full["overall_accuracy"] > 0.80
     assert metrics_test["cohen_kappa"] > 0.50

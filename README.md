@@ -20,8 +20,6 @@ git clone https://github.com/GeoLarryLai/pyGeoMapper.git && cd pyGeoMapper
 pip install maturin && maturin develop --release
 ```
 
-Optional extras: `stac`, `ml`, `viz3d`, `spectral`, `dem`, `test`.
-
 ## Citation
 
 Lai, L.S.-H. (2026) pyGeoMapper. *Zenodo*, [https://doi.org/10.5281/zenodo.23832020](https://doi.org/10.5281/zenodo.23832020)

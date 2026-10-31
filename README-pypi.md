@@ -32,8 +32,6 @@ git clone https://github.com/GeoLarryLai/pyGeoMapper.git && cd pyGeoMapper
 pip install maturin && maturin develop --release
 ```
 
-Optional extras: `stac`, `ml`, `viz3d`, `spectral`, `dem`, `test`.
-
 ## Quick start
 
 ```python
