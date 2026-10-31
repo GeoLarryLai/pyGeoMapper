@@ -2,7 +2,7 @@
 
 # pyGeoMapper
 
-[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.ZENODO_CONCEPT_DOI.svg)](https://doi.org/10.5281/zenodo.ZENODO_CONCEPT_DOI)
+[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23832020.svg)](https://doi.org/10.5281/zenodo.23832020)
 
 v0.1.0
 
@@ -25,7 +25,7 @@ Optional extras: `stac`, `ml`, `viz3d`, `spectral`, `dem`, `test`.
 
 ## Citation
 
-Lai, L.S.-H. (2026) pyGeoMapper. *Zenodo*, [https://doi.org/10.5281/zenodo.ZENODO_CONCEPT_DOI](https://doi.org/10.5281/zenodo.ZENODO_CONCEPT_DOI)
+Lai, L.S.-H. (2026) pyGeoMapper. *Zenodo*, [https://doi.org/10.5281/zenodo.23832020](https://doi.org/10.5281/zenodo.23832020)
 
 Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 [Zevenbergen & Thorne (1987)](https://doi.org/10.1002/esp.3290120107),
