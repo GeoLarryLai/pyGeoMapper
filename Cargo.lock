@@ -174,14 +174,14 @@ dependencies = [
 
 [[package]]
 name = "pygeomapper-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rayon",
 ]
 
 [[package]]
 name = "pygeomapper-py"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "numpy",
  "pygeomapper-core",
