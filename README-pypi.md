@@ -5,20 +5,23 @@
 [![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](https://github.com/GeoLarryLai/pyGeoMapper/blob/main/LICENSE)
 
 ![DEM of Difference and spectral change](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/dod_and_spectral_change.png)
+*A DEM of Difference and a spectral change map, the two basic ways the package spots change on the ground.*
 
-pyGeoMapper maps what changed on the ground and what the ground is made of, from satellite images and elevation
-models (DEMs). It is a Python toolkit with a Rust core, and it ends in 3D block diagrams you can open in a browser.
+> [!WARNING]
+> **pyGeoMapper** is under active development, and many functions are still experimental and not fully validated. Please use with caution.
 
-Status: 0.1.0, early-stage research software. APIs may change; check results before use.
-Not related to `The-Magicians-Code/PyGeoMapper`.
+**pyGeoMapper** maps what changed on the ground, and what it's made of, using satellite images and elevation models (DEMs). I wanted one place to go from raw rasters to something a geologist can actually read: change maps after a landslide, flood, wildfire, earthquake, volcano or glacier event, unit maps scored against a real geologic map, and cross-sections and 3D block diagrams you can open in a browser. It's Python with a Rust core. (Not related to `The-Magicians-Code/PyGeoMapper`.)
 
-**Use it to:**
+## What it can do
 
-- measure elevation and surface change after a landslide, flood, wildfire or earthquake;
-- map geological units automatically from terrain and spectral data, with honest held-out accuracy;
-- draw cross-sections and 3D block diagrams of a field area.
+- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement
+- Compute spectral indices (NDVI, NBR, NDWI, mineral ratios) and terrain metrics (slope, curvature, roughness, multiscale CWT complexity)
+- Make unsupervised and supervised geologic unit maps, with spatial-block holdout accuracy
+- Draw cross-sections and 3D block, cutaway and fence diagrams, and view them in an offline WebGL viewer
+- Five executed notebooks walk through every module with public data
 
 ![3D geological block diagram](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/3d_block_diagram.png)
+*A 3D block diagram of Sheep Mountain Anticline.*
 
 ## Install
 

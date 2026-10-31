@@ -6,11 +6,10 @@
 
 v0.1.0
 
-Maps what changed on the ground, and what it is made of, from satellite images and elevation models (DEMs).
-Python with a Rust core, ending in 3D block diagrams you can open in a browser.
+> [!WARNING]
+> **pyGeoMapper** is under active development, and many functions are still experimental and not fully validated. Please use with caution.
 
-Status: early-stage research software. APIs may change; check results before use.
-Not related to `The-Magicians-Code/PyGeoMapper`.
+**pyGeoMapper** maps what changed on the ground, and what it's made of, using satellite images and elevation models (DEMs). I wanted one place to go from raw rasters to something a geologist can actually read: change maps after a landslide, flood, wildfire, earthquake, volcano or glacier event, unit maps scored against a real geologic map, and cross-sections and 3D block diagrams you can open in a browser. It's Python with a Rust core. (Not related to `The-Magicians-Code/PyGeoMapper`.)
 
 ## Installation
 
@@ -38,28 +37,29 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 [Horton et al. (2017)](https://doi.org/10.3133/ds1052). Data sources: `example_data/SOURCES.txt`, `NOTICE`.
 
 ![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
+*A DEM of Difference and a spectral change map, the two basic ways the package spots change on the ground.*
 
-## Key Features
+## What it can do
 
-- **Surface change:** DEM of Difference with co-registration, spectral change and InSAR/GNSS 3D displacement
-  for landslides, floods, wildfires, earthquakes, volcanoes and glaciers.
-- **Spectral and terrain:** NDVI, NBR, NDWI and mineral ratios; slope, curvature, roughness and multiscale CWT complexity.
-- **Geological mapping:** unsupervised and supervised unit maps with spatial-block holdout accuracy.
-- **Sections and 3D:** cross-sections, 3D block, cutaway and fence diagrams, and an offline WebGL viewer.
+- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement
+- Compute spectral indices (NDVI, NBR, NDWI, mineral ratios) and terrain metrics (slope, curvature, roughness, multiscale CWT complexity)
+- Make unsupervised and supervised geologic unit maps, with spatial-block holdout accuracy
+- Draw cross-sections and 3D block, cutaway and fence diagrams, and view them in an offline WebGL viewer
+- Five executed notebooks walk through every module with public data
 
 ## Examples
 
 ![Earthquake displacement](image/readme_myanmar_earthquake.jpg)
-*2025 Mw 7.7 Myanmar earthquake: ground displacement and offsets from Sentinel-1 (COMET LiCSAR).*
+*Ground displacement and offsets from the 2025 Mw 7.7 Myanmar earthquake, from Sentinel-1 (COMET LiCSAR).*
 
 ![Auto-mapping validation](image/auto_mapping_validation.png)
-*Sheep Mountain Anticline: auto-mapped units vs the USGS map, scored on a held-out block.*
+*Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](image/cross_section.png)
-*Sheep Mountain Anticline cross-section with 3-point bed attitudes.*
+*A Sheep Mountain Anticline cross-section with bed attitudes from 3-point solutions.*
 
 ![3D geological block diagram](image/3d_block_diagram.png)
-*3D block diagram of the same area.*
+*A 3D block diagram of the same area.*
 
 Five executed notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).
