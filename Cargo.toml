@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/pygeomapper-core",
+    "crates/pygeomapper-py",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["Larry Syu-Heng Lai"]
+repository = "https://github.com/GeoLarryLai/pyGeoMapper"
+description = "A toolkit for automated geological and geomorphic mapping from surface geology, remote sensing and DEM data, with 3D terrain visualization and analysis"

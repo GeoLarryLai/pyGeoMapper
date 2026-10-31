@@ -1,0 +1,28 @@
+# Secrets and credentials
+.env
+*.env
+.pypirc
+
+# Rust and Python build artifacts
+target/
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+*.dll
+
+# Test and notebook caches
+.pytest_cache/
+.ipynb_checkpoints/
+.ruff_cache/
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Regenerated 3D meshes (notebook 4)
+outputs/

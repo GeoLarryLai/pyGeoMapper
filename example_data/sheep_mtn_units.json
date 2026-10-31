@@ -1,0 +1,82 @@
+{
+  "site": "Sheep Mountain Anticline, Bighorn Basin, Wyoming, USA",
+  "crs": "EPSG:32612",
+  "grid_shape": [
+    160,
+    160
+  ],
+  "pixel_size_m": 20.0,
+  "utm_origin_x0_y0": [
+    726600.0,
+    4944900.0
+  ],
+  "source": "USGS State Geologic Map Compilation (SGMC, Horton et al., 2017) / Wyoming State Geological Survey (Love & Christiansen, 1985)",
+  "wfs_endpoint": "https://mrdata.usgs.gov/wfs/sgmc?service=WFS&version=1.0.0&request=GetFeature&typeName=Lithology&BBOX=-108.16,44.56,-108.08,44.62",
+  "sentinel2_scene_id": "S2B_12TYQ_20241013_0_L2A",
+  "sentinel2_datetime": "2024-10-13T18:21:42.496000Z",
+  "units": [
+    {
+      "unit_id": 0,
+      "code": "Mm",
+      "sgmc_unit_link": "WYMm;0",
+      "name": "Madison Limestone",
+      "age": "Mississippian",
+      "lithology": "Massive marine limestone and cherty dolostone forming the inner gorge and anticlinal core",
+      "color": "#6baed6"
+    },
+    {
+      "unit_id": 1,
+      "code": "IPta",
+      "sgmc_unit_link": "WYPM;0",
+      "name": "Tensleep Sandstone & Amsden Fm",
+      "age": "Pennsylvanian-Mississippian",
+      "lithology": "Cross-bedded eolian quartzose sandstone, cherty dolostone, and basal red shale",
+      "color": "#9ecae1"
+    },
+    {
+      "unit_id": 2,
+      "code": "TRPc",
+      "sgmc_unit_link": "WYTRPcg;0",
+      "name": "Chugwater & Goose Egg Fms",
+      "age": "Triassic-Permian",
+      "lithology": "Ferric-oxide-rich red siltstone, mudstone, fine sandstone, thin carbonate, and evaporitic gypsum",
+      "color": "#e6550d"
+    },
+    {
+      "unit_id": 3,
+      "code": "Jsg",
+      "sgmc_unit_link": "WYJsg;0",
+      "name": "Sundance & Gypsum Spring Fms",
+      "age": "Middle-Late Jurassic",
+      "lithology": "Glauconitic marine sandstone, greenish-gray calcareous shale, oolitic limestone, and basal gypsum",
+      "color": "#74c476"
+    },
+    {
+      "unit_id": 4,
+      "code": "KJcm",
+      "sgmc_unit_link": "WYKJ;0",
+      "name": "Cloverly & Morrison Fms",
+      "age": "Early Cretaceous-Late Jurassic",
+      "lithology": "Resistant chert-pebble conglomerate and quartz sandstone hogbacks over variegated claystone",
+      "color": "#31a354"
+    },
+    {
+      "unit_id": 5,
+      "code": "Kmt",
+      "sgmc_unit_link": "WYKmt;0",
+      "name": "Mowry & Thermopolis Shales",
+      "age": "Early Cretaceous",
+      "lithology": "Siliceous silver-gray fish-scale shale, bentonite beds, and dark marine mudstone",
+      "color": "#8c6bb1"
+    },
+    {
+      "unit_id": 6,
+      "code": "Qa",
+      "sgmc_unit_link": "WYQa;0",
+      "name": "Quaternary Alluvium & Terrace",
+      "age": "Holocene-Pleistocene",
+      "lithology": "Unconsolidated Bighorn River floodplain sand, silt, gravel, and pediment fan deposits",
+      "color": "#fdd0a2"
+    }
+  ]
+}

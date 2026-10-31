@@ -1,0 +1,11 @@
+[package]
+name = "pygeomapper-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Core Rust kernels for pyGeoMapper: terrain morphometry, spectral indices, surface change (DoD), and 64-band embedding change"
+
+[dependencies]
+rayon = "1.10"

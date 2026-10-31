@@ -1,0 +1,41 @@
+pyGeoMapper
+Copyright 2026 Larry Syu-Heng Lai
+
+This product is licensed under the GNU Affero General Public License, version 3 or
+(at your option) any later version (AGPL-3.0-or-later; see LICENSE).
+
+This product adapts concepts, conventions, or optional integrations with the following
+open-source scientific software and public datasets (each under its own license):
+
+- Rasterio (BSD-3-Clause) and PyProj (MIT) for CRS-aware GeoTIFF/COG I/O and coordinate transformations.
+- pystac-client (Apache-2.0) for STAC catalog querying.
+- spyndex (MIT; Montero et al., 2023, https://github.com/awesome-spectral-indices/spyndex)
+  for standardized spectral index nomenclature and formula conventions.
+- xdem (BSD-3-Clause; https://github.com/GlacioHack/xdem) and Nuth & Kääb (2011,
+  https://doi.org/10.5194/tc-5-271-2011) for DEM of Difference (DoD) co-registration
+  tilt/shift bias correction and volumetric uncertainty propagation concepts.
+- forge3d (Apache-2.0 / MIT; https://pypi.org/project/forge3d/) for WebGPU/Rust 3D terrain rendering.
+- pywbt / WhiteboxTools (MIT; Lindsay, 2016) and Horn (1981) for surface morphometry conventions.
+- pyTopoComplexity (Lai, Booth, Duvall, & Herzig, 2025, Earth Surface Dynamics,
+  https://doi.org/10.5194/esurf-13-417-2025) for multiscale 2D continuous wavelet topographic
+  complexity concepts and optional adapter integration.
+- Google DeepMind AlphaEarth Foundations (Brown et al., 2025; GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL,
+  CC-BY-4.0) for 64-dimensional unit-sphere satellite embedding change conventions.
+- U.S. Geological Survey State Geologic Map Compilation (SGMC; Horton et al., 2017, USGS Data Series 1052,
+  U.S. Public Domain) and Wyoming State Geological Survey (Love & Christiansen, 1985) for public bedrock
+  geological map polygons over Sheep Mountain Anticline, WY.
+
+Example data in example_data/ is derived from public-domain / open-access sources
+(USGS 3DEP, USGS SGMC, ESA/Copernicus Sentinel-2 L2A & GLO-30 DEM via AWS Earth Search,
+and AlphaEarth embedding representations); see example_data/SOURCES.txt for exact provenance and terms.
+
+License compatibility: the third-party software above is under permissive licenses
+(BSD-3-Clause, MIT, Apache-2.0); the Rust crates linked into the extension (PyO3,
+rust-numpy, rayon) are Apache-2.0 / MIT. All are compatible with AGPLv3 and remain
+under their own licenses. Example data keep their original terms (U.S. Public Domain,
+Copernicus/Sentinel free and open data terms, CC-BY-4.0 attribution for AlphaEarth).
+
+Network use (AGPL-3.0 section 13): if you modify pyGeoMapper and let other people
+interact with it over a network (for example by serving its interactive 3D viewer or
+any web app built on it to remote users), you must offer those users the
+Corresponding Source of your modified version. Local use creates no such obligation.

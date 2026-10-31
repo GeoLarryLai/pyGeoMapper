@@ -1,0 +1,21 @@
+name: pygeomapper
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10,<3.14
+  - numpy>=1.22
+  - scipy>=1.9
+  - matplotlib>=3.6
+  - rasterio>=1.3
+  - pyproj>=3.4
+  - pystac-client>=0.7
+  - scikit-learn>=1.2
+  - tifffile>=2023.1
+  - pillow>=9.0
+  - jupyter
+  - pytest
+  - maturin>=1.5,<2.0
+  - rust
+  - pip
+  - pip:
+      - forge3d
