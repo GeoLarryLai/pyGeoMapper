@@ -6,8 +6,6 @@
 
 v0.1.0
 
-![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
-
 Maps what changed on the ground, and what it is made of, from satellite images and elevation models (DEMs).
 Python with a Rust core, ending in 3D block diagrams you can open in a browser.
 
@@ -39,6 +37,8 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 [Staley et al. (2017)](https://doi.org/10.1016/j.geomorph.2016.10.019),
 [Horton et al. (2017)](https://doi.org/10.3133/ds1052). Data sources: `example_data/SOURCES.txt`, `NOTICE`.
 
+![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
+
 ## Key Features
 
 - **Surface change:** DEM of Difference with co-registration, spectral change and InSAR/GNSS 3D displacement
@@ -47,7 +47,7 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 - **Geological mapping:** unsupervised and supervised unit maps with spatial-block holdout accuracy.
 - **Sections and 3D:** cross-sections, 3D block, cutaway and fence diagrams, and an offline WebGL viewer.
 
-## Results
+## Examples
 
 ![Earthquake displacement](image/readme_myanmar_earthquake.jpg)
 *2025 Mw 7.7 Myanmar earthquake: ground displacement and offsets from Sentinel-1 (COMET LiCSAR).*
