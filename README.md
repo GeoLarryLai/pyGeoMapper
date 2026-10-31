@@ -1,8 +1,8 @@
-<p align="center"><img src="image/logo.png" alt="pyGeoMapper" width="160"></p>
+<p align="center"><img src="image/logo.png" alt="pyGeoMapper" width="240"></p>
 
 # pyGeoMapper
 
-[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23832020.svg)](https://doi.org/10.5281/zenodo.23832020)
+[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23832020.svg)](https://doi.org/10.5281/zenodo.23832020) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
 
 v0.1.0
 
@@ -75,6 +75,4 @@ dod = surface_change.compute_dod(dem1, dem2)                        # elevation 
 cwt = terrain_analysis.compute_multiscale_complexity(dem2)          # terrain roughness at several scales
 ```
 
-## License
-
-Copyright (C) 2026 Larry Syu-Heng Lai. AGPL-3.0-or-later (`LICENSE`, `NOTICE`).
+Third-party notices and data credits: [`NOTICE`](NOTICE).

@@ -1,8 +1,8 @@
-<p align="center"><img src="https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/logo.png" alt="pyGeoMapper" width="160"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/logo.png" alt="pyGeoMapper" width="240"></p>
 
 # pyGeoMapper
 
-[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper)
+[![PyPI version](https://img.shields.io/pypi/v/pygeomapper.svg)](https://pypi.org/project/pygeomapper/) [![pepy downloads](https://static.pepy.tech/badge/pygeomapper)](https://pepy.tech/project/pygeomapper) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](https://github.com/GeoLarryLai/pyGeoMapper/blob/main/LICENSE)
 
 ![DEM of Difference and spectral change](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/dod_and_spectral_change.png)
 
@@ -77,6 +77,4 @@ Full metadata is in `CITATION.cff` in the repository. Methods: [Horn (1981)](htt
 [Staley et al. (2017)](https://doi.org/10.1016/j.geomorph.2016.10.019),
 [Horton et al. (2017)](https://doi.org/10.3133/ds1052). Data sources: `example_data/SOURCES.txt`, `NOTICE`.
 
-## Licence
-
-Copyright (C) 2026 Larry Syu-Heng Lai. AGPL-3.0-or-later (`LICENSE`, `NOTICE`).
+Third-party notices and data credits: [`NOTICE`](https://github.com/GeoLarryLai/pyGeoMapper/blob/main/NOTICE).
