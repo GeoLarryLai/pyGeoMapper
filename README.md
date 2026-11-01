@@ -2,7 +2,7 @@
 <p align="center">
 <a href="https://doi.org/10.5281/zenodo.23832020"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23832020-blue" alt="DOI"></a> <a href="https://github.com/GeoLarryLai/pyGeoMapper/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-lightgrey" alt="License"></a>
 <br>
-<a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/pypi/v/pygeomapper?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pygeomapper"><img src="https://img.shields.io/pepy/dt/pygeomapper?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a>
+<a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/pypi/v/pygeomapper?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pygeomapper"><img src="https://img.shields.io/pepy/dt/pygeomapper?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a> <a href="https://anaconda.org/conda-forge/pygeomapper"><img src="https://img.shields.io/conda/vn/conda-forge/pygeomapper?label=conda-forge&color=green" alt="conda-forge version"></a> <a href="https://anaconda.org/conda-forge/pygeomapper"><img src="https://img.shields.io/conda/dn/conda-forge/pygeomapper?label=conda%20downloads&color=green" alt="conda downloads"></a>
 </p>
 
 # pyGeoMapper
