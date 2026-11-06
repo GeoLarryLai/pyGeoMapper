@@ -42,7 +42,7 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 
 ## What it can do
 
-- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement (wrapped fringes on imagery, horizontal and vertical motion)
+- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement (offset tracking, wrapped phase, horizontal and vertical motion)
 - Compute spectral indices (NDVI, NBR, NDWI, mineral ratios) and terrain metrics (slope, curvature, roughness, multiscale CWT complexity)
 - Make unsupervised and supervised geologic unit maps, with spatial-block holdout accuracy
 - Draw cross-sections and 3D block, cutaway and fence diagrams, and view them in an offline WebGL viewer
@@ -50,20 +50,20 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 
 ## Examples
 
-![Myanmar 2025 earthquake in 3D](image/myanmar_insar_3d.jpg)
-*The 2025 Mw 7.7 Myanmar earthquake from real Sentinel-1 data (COMET LiCSAR): interferogram fringes on pre-event Sentinel-2 imagery, horizontal motion with arrows, and vertical motion.*
+![Myanmar 2025 earthquake LiCSAR](image/case1a_myanmar_earthquake.jpg)
+*2025 Mw 7.7 Myanmar (Sagaing): real Sentinel-1 COMET LiCSAR — N–S displacement with arrows, azimuth and range offsets, and wrapped phase on GLO-30 hillshade (tracks 106D / 070A).*
 
-![Oso landslide roughness change](image/oso_cwt_change.png)
-*Terrain roughness (multiscale 2D wavelet complexity) before and after the 2014 Oso landslide, and the change.*
+![Multiscale CWT complexity](image/cwt_multiscale.png)
+*2D Mexican-hat CWT at Sheep Mountain (DEM, ridges/valleys, multiscale complexity, dominant wavelength, A–A′ energy profile) plus Oso Δcomplexity.*
 
 ![Auto-mapping validation](image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](image/cross_section.png)
-*A Sheep Mountain Anticline cross-section from 3-point bed attitudes, without and with a NE-dipping forelimb reverse fault.*
+*Sheep Mountain A–A′ from 3-point bed attitudes, without and with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
 
 ![3D geological block diagram](image/3d_block_diagram.png)
-*A 3D block diagram of the same area; the red line is where the thrust fault cuts the surface and the front walls.*
+*Same A–A′ cuts in 3D — no fault vs reconstructed basement thrust with the fault plane shown.*
 
 Five executed notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).

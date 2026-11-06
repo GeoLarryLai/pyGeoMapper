@@ -69,20 +69,20 @@ cwt = terrain_analysis.compute_multiscale_complexity(dem2)          # terrain ro
 
 ## Examples
 
-![Myanmar 2025 earthquake in 3D](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/myanmar_insar_3d.jpg)
-*The 2025 Mw 7.7 Myanmar earthquake from real Sentinel-1 data (COMET LiCSAR): interferogram fringes on pre-event Sentinel-2 imagery, horizontal motion with arrows, and vertical motion.*
+![Myanmar 2025 earthquake LiCSAR](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/case1a_myanmar_earthquake.jpg)
+*2025 Mw 7.7 Myanmar (Sagaing): real Sentinel-1 COMET LiCSAR — N–S displacement with arrows, azimuth and range offsets, and wrapped phase on GLO-30 hillshade (tracks 106D / 070A).*
 
-![Oso landslide roughness change](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/oso_cwt_change.png)
-*Terrain roughness (multiscale 2D wavelet complexity) before and after the 2014 Oso landslide, and the change.*
+![Multiscale CWT complexity](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/cwt_multiscale.png)
+*2D Mexican-hat CWT at Sheep Mountain (DEM, ridges/valleys, multiscale complexity, dominant wavelength, A–A′ energy profile) plus Oso Δcomplexity.*
 
 ![Auto-mapping validation](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/cross_section.png)
-*A Sheep Mountain Anticline cross-section from 3-point bed attitudes, without and with a NE-dipping forelimb reverse fault.*
+*Sheep Mountain A–A′ from 3-point bed attitudes, without and with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
 
 ![3D geological block diagram](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/3d_block_diagram.png)
-*A 3D block diagram of the same area; the red line is where the thrust fault cuts the surface and the front walls.*
+*Same A–A′ cuts in 3D — no fault vs reconstructed basement thrust with the fault plane shown.*
 
 Five executed notebooks in `notebooks/` of the [repository](https://github.com/GeoLarryLai/pyGeoMapper) walk through every module with public data:
 

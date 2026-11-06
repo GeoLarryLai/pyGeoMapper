@@ -177,6 +177,23 @@ def test_geological_cross_section_geometry_and_fault_offset() -> None:
     # Bottom row is below min(z_topo), so subsurface_units there must be all finite unit IDs
     assert np.all(np.isfinite(sec["subsurface_units"][0, :]))
 
+    tip = cross_section.locate_fault_tip_along_section(dem, start_xy, end_xy)
+    fault_3d = cross_section.reconstruct_planar_fault(
+        dem,
+        strike_deg=140.0,
+        dip_deg=50.0,
+        throw_m=float(np.clip(0.5 * tip["section_relief_m"], 80.0, 200.0)),
+        name="Sheep Mountain basement thrust",
+        tip_section=(start_xy, end_xy, tip["distance_m"]),
+        z0=tip["z"],
+        published={"strike_deg": 140.0, "dip_deg": 50.0},
+        inferred={"throw_m": tip["section_relief_m"]},
+    )
+    fault_2d = cross_section.section_fault_params(fault_3d, start_xy, end_xy)
+    assert fault_2d["dip_deg"] < 0  # SW dip toward A on A→A′
+    assert abs(fault_2d["dip_deg"] + 50.0) < 5.0
+    assert abs(fault_2d["distance_m"] - tip["distance_m"]) < 1.0
+
     sec_fault = cross_section.build_geological_cross_section(
         dem,
         geol,
@@ -184,9 +201,10 @@ def test_geological_cross_section_geometry_and_fault_offset() -> None:
         end_xy=end_xy,
         attitudes=attitudes,
         depth_m=350.0,
-        faults=[{"distance_m": 1350.0, "dip_deg": -65.0, "throw_m": 55.0, "name": "Test Fault"}],
+        faults=[fault_2d],
     )
     assert len(sec_fault["fault_traces"]) == 1
+    assert sec_fault["fault_traces"][0]["dip_deg"] < 0
     fig, _ = cross_section.plot_geological_cross_section(sec_fault, unit_metadata=unit_metadata)
     plt.close(fig)
 

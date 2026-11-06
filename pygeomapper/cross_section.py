@@ -10,6 +10,8 @@ Includes:
 - 3-point / least-squares / robust-trimmed planar attitude solver (`estimate_bed_attitude`)
   and automated contact attitude scanner (`estimate_contact_attitudes`) in Rust
 - Apparent dip projection (`compute_apparent_dip`)
+- Planar fault reconstruction shared by 2D sections and 3D blocks (`reconstruct_planar_fault`,
+  `section_fault_params`, `locate_fault_tip_along_section`)
 - Potential-field shallow geological cross-section builder (`build_geological_cross_section`)
   and publication-ready 2D cross-section renderer (`plot_geological_cross_section`).
 """
@@ -180,6 +182,207 @@ def compute_apparent_dip(
             float(dip_deg), float(dip_dir_deg), float(section_azimuth_deg)
         )
     )
+
+
+def locate_fault_tip_along_section(
+    dem: GeoGrid,
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+    *,
+    n_samples: int = 250,
+    swath_width_m: float = 120.0,
+    slope_threshold: float = 0.25,
+) -> dict[str, Any]:
+    """
+    Infer a surface fault-tip location along `start_xy → end_xy` from DEM geometry.
+
+    Finds the topographic crest, then the toe of the steep descending limb toward `end_xy`
+    (last sample after the crest where |dz/ds| exceeds `slope_threshold`). Returns map
+    coordinates, section distance, and surface elevation. This is a geometric inference for
+    shallow demos when no mapped fault tip is available — not a published tip location.
+    """
+    prof = extract_swath_profile(
+        dem,
+        start_xy=start_xy,
+        end_xy=end_xy,
+        n_samples=n_samples,
+        swath_width_m=swath_width_m,
+    )
+    dist_m = np.asarray(prof["distance_m"], dtype=np.float64)
+    z = np.asarray(prof["center"], dtype=np.float64)
+    xs = np.asarray(prof["x"], dtype=np.float64)
+    ys = np.asarray(prof["y"], dtype=np.float64)
+    dz = np.gradient(z, dist_m)
+    i_crest = int(np.nanargmax(z))
+    after = np.arange(i_crest, len(dist_m))
+    steep = after[np.abs(dz[after]) > float(slope_threshold)]
+    i_tip = int(steep[-1]) if len(steep) else int(np.clip(i_crest + (len(dist_m) - i_crest) // 2, 0, len(dist_m) - 1))
+    return {
+        "distance_m": float(dist_m[i_tip]),
+        "x": float(xs[i_tip]),
+        "y": float(ys[i_tip]),
+        "z": float(z[i_tip]),
+        "crest_distance_m": float(dist_m[i_crest]),
+        "crest_z_m": float(z[i_crest]),
+        "section_relief_m": float(z[i_crest] - z[-1]),
+        "method": "steep_forelimb_toe",
+        "slope_threshold": float(slope_threshold),
+    }
+
+
+def reconstruct_planar_fault(
+    dem: GeoGrid,
+    *,
+    strike_deg: float,
+    dip_deg: float,
+    throw_m: float,
+    name: str = "Fault",
+    tip_xy: tuple[float, float] | None = None,
+    tip_section: tuple[tuple[float, float], tuple[float, float], float] | None = None,
+    z0: float | None = None,
+    listric_curvature: float = 0.0,
+    published: dict[str, Any] | None = None,
+    inferred: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Reconstruct a single planar (or mildly listric) fault for both 2D sections and 3D blocks.
+
+    Pass published attitude / tip constraints explicitly; anything not published should be listed
+    under `inferred` (do not silently invent mismatched demo dips in separate notebooks).
+
+    Parameters
+    ----------
+    dem :
+        Elevation grid used to sample tip elevation when `z0` is omitted.
+    strike_deg, dip_deg :
+        Right-hand-rule strike and true dip (0–90°). Dip direction is `(strike + 90) % 360`.
+    throw_m :
+        Vertical hanging-wall throw (positive = HW up).
+    tip_xy :
+        Optional map tip `(x, y)`. Ignored if `tip_section` is given.
+    tip_section :
+        Optional `(start_xy, end_xy, distance_m)` placing the tip on a section line.
+    z0 :
+        Optional tip elevation (m). Default: DEM at the tip.
+    published, inferred :
+        Free-form provenance dicts copied into the result for notebook/README labeling.
+
+    Returns
+    -------
+    dict
+        Canonical fault with 3D fields (`x0`, `y0`, `z0`, `strike_deg`, `dip_deg`, `throw_m`, …)
+        plus helpers consumed by `section_fault_params` / `build_3d_block_diagram(fault_spec=…)`.
+    """
+    strike = float(strike_deg) % 360.0
+    dip = float(np.clip(abs(dip_deg), 0.0, 90.0))
+    dip_dir = (strike + 90.0) % 360.0
+    throw = float(throw_m)
+
+    if tip_section is not None:
+        start_xy, end_xy, dist_m = tip_section
+        xa, ya = (float(start_xy[0]), float(start_xy[1]))
+        xb, yb = (float(end_xy[0]), float(end_xy[1]))
+        length = float(np.hypot(xb - xa, yb - ya))
+        t = float(np.clip(float(dist_m) / max(length, 1e-6), 0.0, 1.0))
+        x0 = xa + t * (xb - xa)
+        y0 = ya + t * (yb - ya)
+        tip_distance_m = float(dist_m)
+        tip_start_xy = (xa, ya)
+        tip_end_xy = (xb, yb)
+    elif tip_xy is not None:
+        x0, y0 = (float(tip_xy[0]), float(tip_xy[1]))
+        tip_distance_m = None
+        tip_start_xy = tip_end_xy = None
+    else:
+        xs = dem.x_coords()
+        ys = dem.y_coords()
+        x0 = float(xs.min() + 0.65 * (xs.max() - xs.min()))
+        y0 = float(ys.min() + 0.65 * (ys.max() - ys.min()))
+        tip_distance_m = None
+        tip_start_xy = tip_end_xy = None
+
+    if z0 is None:
+        # Bilinear sample of DEM at tip
+        col = (x0 - dem.x0) / dem.dx - 0.5
+        row = (y0 - dem.y0) / dem.dy - 0.5
+        c0 = int(np.clip(np.floor(col), 0, dem.cols - 2))
+        r0 = int(np.clip(np.floor(row), 0, dem.rows - 2))
+        tc = float(np.clip(col - c0, 0.0, 1.0))
+        tr = float(np.clip(row - r0, 0.0, 1.0))
+        z00 = float(dem.data[r0, c0])
+        z01 = float(dem.data[r0, c0 + 1])
+        z10 = float(dem.data[r0 + 1, c0])
+        z11 = float(dem.data[r0 + 1, c0 + 1])
+        z_tip = (1 - tr) * ((1 - tc) * z00 + tc * z01) + tr * ((1 - tc) * z10 + tc * z11)
+        if not np.isfinite(z_tip):
+            z_tip = float(np.nanmedian(dem.data))
+    else:
+        z_tip = float(z0)
+
+    fault = {
+        "name": str(name),
+        "x0": float(x0),
+        "y0": float(y0),
+        "z0": float(z_tip),
+        "strike_deg": strike,
+        "dip_deg": dip,
+        "dip_dir_deg": float(dip_dir),
+        "throw_m": throw,
+        "listric_curvature": float(listric_curvature),
+        "tip_distance_m": tip_distance_m,
+        "tip_section_start_xy": tip_start_xy,
+        "tip_section_end_xy": tip_end_xy,
+        "published": dict(published or {}),
+        "inferred": dict(inferred or {}),
+    }
+    return fault
+
+
+def section_fault_params(
+    fault: dict[str, Any],
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+) -> dict[str, Any]:
+    """
+    Project a reconstructed 3D planar fault into 2D section parameters for
+    `build_geological_cross_section(..., faults=[...])`.
+
+    `dip_deg` is the signed apparent dip in the section (>0 dips toward `end_xy`, <0 toward
+    `start_xy`). Tip distance is the orthogonal projection of `(x0, y0)` onto the section line
+    unless `tip_section` was used when reconstructing and matches this line.
+    """
+    xa, ya = (float(start_xy[0]), float(start_xy[1]))
+    xb, yb = (float(end_xy[0]), float(end_xy[1]))
+    dx, dy = (xb - xa, yb - ya)
+    length = float(np.hypot(dx, dy))
+    section_az = float(np.rad2deg(np.arctan2(dx, dy)) % 360.0)
+
+    tip_start = fault.get("tip_section_start_xy")
+    tip_end = fault.get("tip_section_end_xy")
+    tip_dist = fault.get("tip_distance_m")
+    same_section = (
+        tip_start is not None
+        and tip_end is not None
+        and tip_dist is not None
+        and np.allclose(tip_start, (xa, ya), atol=1.0)
+        and np.allclose(tip_end, (xb, yb), atol=1.0)
+    )
+    if same_section:
+        distance_m = float(tip_dist)
+    else:
+        t = 0.0 if length < 1e-6 else float(((fault["x0"] - xa) * dx + (fault["y0"] - ya) * dy) / (length * length))
+        distance_m = float(np.clip(t, 0.0, 1.0) * length)
+
+    app_dip = compute_apparent_dip(float(fault["dip_deg"]), float(fault["dip_dir_deg"]), section_az)
+    return {
+        "distance_m": distance_m,
+        "dip_deg": float(app_dip),
+        "throw_m": float(fault["throw_m"]),
+        "name": str(fault.get("name", "Fault")),
+        "strike_deg": float(fault["strike_deg"]),
+        "true_dip_deg": float(fault["dip_deg"]),
+        "dip_dir_deg": float(fault["dip_dir_deg"]),
+    }
 
 
 def _in_hanging_wall(fault: dict[str, float], s: np.ndarray, z: np.ndarray) -> np.ndarray:
@@ -353,11 +556,11 @@ def build_geological_cross_section(
     if faults:
         for f in faults:
             f_s0 = float(f["distance_m"])
-            f_dip = float(f.get("dip_deg", 65.0))
+            f_dip = float(f.get("dip_deg", -50.0))
             f_throw = float(f.get("throw_m", 40.0))
             f_name = str(f.get("name", "Fault"))
             f_z0 = float(np.interp(f_s0, dist_m, z_topo))
-            cot_dip = 1.0 / np.tan(np.deg2rad(f_dip if abs(f_dip) > 5.0 else 65.0))
+            cot_dip = 1.0 / np.tan(np.deg2rad(f_dip if abs(f_dip) > 5.0 else -50.0))
             # Fault trace position s_fault(z) = f_s0 + (f_z0 - z) * cot_dip
             geom = {"s0": f_s0, "z0": f_z0, "cot_dip": cot_dip, "dip_deg": f_dip, "throw_m": f_throw}
             fault_geoms.append(geom)

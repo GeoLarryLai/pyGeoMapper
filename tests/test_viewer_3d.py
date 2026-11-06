@@ -9,7 +9,7 @@ import struct
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pygeomapper import _core, raster_io, viewer_3d
+from pygeomapper import _core, cross_section, raster_io, viewer_3d
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "example_data"
@@ -73,17 +73,21 @@ def test_sheep_mountain_3d_block_and_cutaway_meshes():
     geol = raster_io.load_geotiff(DATA_DIR / "sheep_mtn_geol_units.tif")
     units_meta = json.loads((DATA_DIR / "sheep_mtn_units.json").read_text(encoding="utf-8"))
 
-    xs = dem.x_coords()
-    ys = dem.y_coords()
-    fault_spec = {
-        "name": "Sheep Mountain Forelimb Thrust",
-        "x0": float(xs.min() + 0.34 * (xs.max() - xs.min())),
-        "y0": float(ys.min() + 0.34 * (ys.max() - ys.min())),
-        "z0": 1245.0,
-        "strike_deg": 140.0,
-        "dip_deg": 58.0,
-        "throw_m": 75.0,
-    }
+    start_xy, end_xy = (726900.0, 4942800.0), (729700.0, 4944600.0)
+    tip = cross_section.locate_fault_tip_along_section(dem, start_xy, end_xy)
+    fault_spec = cross_section.reconstruct_planar_fault(
+        dem,
+        strike_deg=140.0,
+        dip_deg=50.0,
+        throw_m=float(np.clip(0.5 * tip["section_relief_m"], 80.0, 200.0)),
+        name="Sheep Mountain basement thrust",
+        tip_section=(start_xy, end_xy, tip["distance_m"]),
+        z0=tip["z"],
+        published={"dip_deg": 50.0, "strike_deg": 140.0},
+        inferred={"throw_m": "from DEM relief", "tip": "forelimb toe"},
+    )
+    assert fault_spec["dip_deg"] == 50.0
+    assert fault_spec["strike_deg"] == 140.0
 
     block = viewer_3d.build_3d_block_diagram(
         dem=dem,
@@ -92,8 +96,20 @@ def test_sheep_mountain_3d_block_and_cutaway_meshes():
         z_bottom=750.0,
         nz=48,
         fault_spec=fault_spec,
+        include_fault=True,
         cutaway_fraction=(0.45, 0.45, 0.35),
     )
+    block_plain = viewer_3d.build_3d_block_diagram(
+        dem=dem,
+        geol_labels=geol,
+        units_metadata=units_meta,
+        z_bottom=750.0,
+        nz=32,
+        fault_spec=fault_spec,
+        include_fault=False,
+    )
+    assert block_plain["fault_spec"] is None
+    assert np.allclose(block_plain["fault_offset_volume"], 0.0)
 
     mesh = block["mesh"]
     cut_mesh = block["cutaway_mesh"]
@@ -200,10 +216,17 @@ def test_3d_renderers_and_forge3d_adapter():
     fig3, _ = viewer_3d.plot_3d_fence_diagram(block)
     plt.close(fig3)
 
-    # Fault trace on the top surface and front walls when show_fault_plane=True (NE-dipping, strike 320)
-    xs, ys = dem.x_coords(), dem.y_coords()
-    fault = {"x0": float(xs.mean()), "y0": float(ys.mean()), "z0": 1300.0, "strike_deg": 320.0, "dip_deg": 58.0,
-             "throw_m": 75.0}
+    # SW-dipping basement thrust (strike 140° RHR); show_fault_plane draws surface/wall traces on solid block
+    start_xy, end_xy = (726900.0, 4942800.0), (729700.0, 4944600.0)
+    tip = cross_section.locate_fault_tip_along_section(dem, start_xy, end_xy)
+    fault = cross_section.reconstruct_planar_fault(
+        dem,
+        strike_deg=140.0,
+        dip_deg=50.0,
+        throw_m=120.0,
+        tip_section=(start_xy, end_xy, tip["distance_m"]),
+        z0=tip["z"],
+    )
     block_f = viewer_3d.build_3d_block_diagram(
         dem=dem, geol_labels=geol, units_metadata=units_meta, z_bottom=800.0, nz=20, fault_spec=fault
     )
@@ -211,6 +234,14 @@ def test_3d_renderers_and_forge3d_adapter():
     red = [ln for ln in ax4.get_lines() if ln.get_color() == "#d62728"]
     assert red, "fault trace not drawn"
     plt.close(fig4)
+
+    block_u = viewer_3d.build_3d_block_diagram(
+        dem=dem, geol_labels=geol, units_metadata=units_meta, z_bottom=800.0, nz=20,
+        fault_spec=fault, include_fault=False,
+    )
+    fig5, _ = viewer_3d.plot_3d_section_comparison(block_u, block_f, start_xy, end_xy, n_samples=80)
+    assert len(fig5.axes) >= 2
+    plt.close(fig5)
 
 
 def test_notebook_4_executed_cleanly():

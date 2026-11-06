@@ -29,3 +29,5 @@ outputs/
 
 # Internal review ledger; do not ship
 AI_EDITING_LOG.md
+
+.venv/
