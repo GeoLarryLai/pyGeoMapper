@@ -217,27 +217,18 @@ def regenerate_cross_section() -> Path:
     print("cross-section fault inferred:", fault_3d["inferred"])
     print("section params:", fault_2d)
 
-    sec_u = cross_section.build_geological_cross_section(
-        dem, geol, start_xy=start_xy, end_xy=end_xy, attitudes=attitudes, depth_m=360.0, faults=None
-    )
+    # README shows the faulted A–A′ only (faults=None remains available as a user toggle).
     sec_f = cross_section.build_geological_cross_section(
         dem, geol, start_xy=start_xy, end_xy=end_xy, attitudes=attitudes, depth_m=360.0, faults=[fault_2d]
     )
-    fig, axes = plt.subplots(2, 1, figsize=(13, 9.2), layout="constrained")
-    cross_section.plot_geological_cross_section(
-        sec_u,
-        unit_metadata=unit_metadata,
-        vertical_exaggeration=1.6,
-        ax=axes[0],
-        title="(a) Sheep Mountain Anticline cross-section A–A' (SW core to NE limb, 3-point attitudes)",
-    )
+    fig, ax = plt.subplots(figsize=(13, 5.2), layout="constrained")
     cross_section.plot_geological_cross_section(
         sec_f,
         unit_metadata=unit_metadata,
         vertical_exaggeration=1.6,
-        ax=axes[1],
+        ax=ax,
         title=(
-            f"(b) Same section with SW-dipping ~50° basement thrust "
+            "Sheep Mountain Anticline A–A′ with published SW-dipping ~50° basement thrust "
             f"(apparent {fault_2d['dip_deg']:.0f}°, throw = +{fault_2d['throw_m']:.0f} m inferred)"
         ),
     )
@@ -254,17 +245,6 @@ def regenerate_3d_block() -> tuple[Path, Path]:
     attitudes = cross_section.estimate_contact_attitudes(geol, dem, window_m=320.0)
     start_xy, end_xy, fault_spec = _sheep_fault(dem)
 
-    block_plain = viewer_3d.build_3d_block_diagram(
-        dem=dem,
-        geol_labels=geol,
-        units_metadata=units_meta,
-        attitudes=attitudes,
-        z_bottom=750.0,
-        nz=64,
-        fault_spec=fault_spec,
-        include_fault=False,
-        cutaway_fraction=(0.48, 0.48, 0.36),
-    )
     block_f = viewer_3d.build_3d_block_diagram(
         dem=dem,
         geol_labels=geol,
@@ -277,23 +257,25 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         cutaway_fraction=(0.48, 0.48, 0.36),
     )
 
-    fig, _ = viewer_3d.plot_3d_section_comparison(
-        block_plain,
+    # Solid volumetric block (A–A′ marked) | matching faulted section from a different camera.
+    fig, _ = viewer_3d.plot_3d_block_and_section(
         block_f,
         start_xy,
         end_xy,
         vertical_exaggeration=1.7,
-        elevation_deg=22.0,
+        block_azimuth_deg=-58.0,
+        block_elevation_deg=28.0,
+        section_elevation_deg=22.0,
         n_samples=160,
         show_fault_plane=True,
         titles=(
-            "(a) 3D section A–A′ (no fault)",
-            f"(b) 3D section A–A′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
+            "(a) 3D geologic block with A–A′ section location",
+            f"(b) Matching 3D section A–A′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
             f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
         ),
     )
     out1 = IMG / "3d_block_diagram.png"
-    plotting.save_figure(fig, out1, max_width_px=1500)
+    plotting.save_figure(fig, out1, max_width_px=1400, palette=True)
     plt.close(fig)
 
     fence_panels = viewer_3d.slice_3d_fence_diagram(block_f, transects=[(start_xy, end_xy)], n_samples=160)

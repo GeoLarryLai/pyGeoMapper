@@ -62,7 +62,7 @@ def test_pypi_readme_images_are_subset_of_github_readme() -> None:
 
 
 def test_readme_gallery_uses_restored_science_figures() -> None:
-    """GitHub README must show the 4-panel LiCSAR board, six-panel CWT board, and solid A–A′ 3D cuts."""
+    """GitHub README must show the 4-panel LiCSAR board, six-panel CWT board, and solid+section 3D pair."""
     text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     for required in (
         "image/case1a_myanmar_earthquake.jpg",

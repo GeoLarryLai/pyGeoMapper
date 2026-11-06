@@ -60,10 +60,10 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](image/cross_section.png)
-*Sheep Mountain A–A′ from 3-point bed attitudes, without and with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
+*Sheep Mountain A–A′ from 3-point bed attitudes with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
 
 ![3D geological block diagram](image/3d_block_diagram.png)
-*Same A–A′ cuts in 3D — no fault vs reconstructed basement thrust with the fault plane shown.*
+*Solid 3D geologic block with A–A′ marked (left) and the matching faulted 3D section with reconstructed basement-thrust plane (right).*
 
 Five executed notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).

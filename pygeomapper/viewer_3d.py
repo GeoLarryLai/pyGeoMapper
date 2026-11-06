@@ -21,9 +21,10 @@ perspective DEM draping (`plot_3d_terrain_drape`), plus:
 - `render_with_forge3d`: High-resolution terrain/block drape adapter integrating `forge3d`
   (https://pypi.org/project/forge3d/) when available, with automatic fallback.
 - `plot_3d_block_diagram`, `plot_3d_cutaway_block`, `plot_3d_fence_diagram`,
-  `plot_3d_section_comparison`: Publication-ready 3D block / cutaway / fence renderers, plus a
-  two-panel A–A′ comparison (unfaulted vs reconstructed fault plane). `include_fault` /
-  `show_fault_plane` toggle loading and drawing of a plane from `reconstruct_planar_fault`.
+  `plot_3d_block_and_section`: Publication-ready 3D block / cutaway / fence renderers, plus a
+  README-style pair (solid volumetric block with A–A′ marked | matching faulted section view).
+  `include_fault` / `show_fault_plane` toggle loading and drawing of a plane from
+  `reconstruct_planar_fault`.
 - `export_interactive_block_html` & `launch_block_viewer`: Self-contained, 100% offline
   interactive 3D HTML5/WebGL canvas block-diagram viewer for Jupyter notebooks and browsers.
 """
@@ -463,8 +464,8 @@ def build_3d_block_diagram(
         3D planar or listric fault from `cross_section.reconstruct_planar_fault` (preferred) or an equivalent
         dict: `{'x0', 'y0', 'z0', 'strike_deg', 'dip_deg', 'throw_m', 'name'}`.
     include_fault : bool, default True
-        When False, the block is built without a fault even if `fault_spec` is provided (toggle for
-        unfaulted vs faulted comparison figures).
+        When False, the block is built without a fault even if `fault_spec` is provided (API toggle;
+        README figures ship the faulted reconstruction).
     cutaway_fraction : tuple of (y_frac, x_frac, z_frac), optional
         When provided (e.g., `(0.45, 0.48, 0.35)`), also generates a cutaway 3D mesh (`cutaway_mesh`)
         with the SW/front sub-block excavated down to `z_frac` so internal folded beds and fault offsets are exposed.
@@ -915,6 +916,81 @@ def _add_unit_legend(ax: Any, units_metadata: Sequence[dict[str, Any]], include_
     )
 
 
+def _sample_dem_polyline(
+    dem: GeoGrid,
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+    n: int = 80,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Bilinear DEM samples along a map polyline (x, y, z)."""
+    xa, ya = (float(start_xy[0]), float(start_xy[1]))
+    xb, yb = (float(end_xy[0]), float(end_xy[1]))
+    xs = np.linspace(xa, xb, int(n))
+    ys = np.linspace(ya, yb, int(n))
+    cols = (xs - dem.x0) / dem.dx - 0.5
+    rows = (ys - dem.y0) / dem.dy - 0.5
+    c0 = np.clip(np.floor(cols).astype(int), 0, dem.cols - 2)
+    r0 = np.clip(np.floor(rows).astype(int), 0, dem.rows - 2)
+    tc = np.clip(cols - c0, 0.0, 1.0)
+    tr = np.clip(rows - r0, 0.0, 1.0)
+    z00 = dem.data[r0, c0]
+    z01 = dem.data[r0, c0 + 1]
+    z10 = dem.data[r0 + 1, c0]
+    z11 = dem.data[r0 + 1, c0 + 1]
+    zs = (1 - tr) * ((1 - tc) * z00 + tc * z01) + tr * ((1 - tc) * z10 + tc * z11)
+    zs = np.where(np.isfinite(zs), zs, float(np.nanmedian(dem.data)))
+    return xs, ys, zs
+
+
+def mark_section_on_block(
+    ax: Any,
+    block_model: dict[str, Any],
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+    *,
+    label_a: str = "A",
+    label_ap: str = "A'",
+    color: str = "#111111",
+    linewidth: float = 2.8,
+    n_samples: int = 100,
+) -> None:
+    """Draw the A–A' surface trace on a solid 3D block (map polyline lifted to the DEM)."""
+    dem: GeoGrid = block_model["dem"]
+    xs = dem.x_coords()
+    ys = dem.y_coords()
+    x_min, y_min = (float(xs.min()), float(ys.min()))
+    px, py, pz = _sample_dem_polyline(dem, start_xy, end_xy, n=n_samples)
+    ax.plot(
+        px - x_min,
+        py - y_min,
+        pz + 10.0,
+        color=color,
+        linewidth=linewidth,
+        zorder=25,
+        solid_capstyle="round",
+    )
+    ax.text(
+        float(px[0] - x_min),
+        float(py[0] - y_min),
+        float(pz[0]) + 35.0,
+        label_a,
+        fontsize=11,
+        fontweight="bold",
+        color=color,
+        zorder=26,
+    )
+    ax.text(
+        float(px[-1] - x_min),
+        float(py[-1] - y_min),
+        float(pz[-1]) + 35.0,
+        label_ap,
+        fontsize=11,
+        fontweight="bold",
+        color=color,
+        zorder=26,
+    )
+
+
 def plot_3d_block_diagram(
     block_model: dict[str, Any],
     surface_drape_rgba: np.ndarray | None = None,
@@ -928,6 +1004,7 @@ def plot_3d_block_diagram(
     show_legend: bool = True,
     ax: Any | None = None,
     title: str | None = "3D Geological Block Diagram (Surface & Projected Subsurface)",
+    section_xy: tuple[tuple[float, float], tuple[float, float]] | None = None,
 ) -> tuple[Any, Any]:
     """
     Render a publication-quality 3D perspective geological block diagram showing:
@@ -936,6 +1013,7 @@ def plot_3d_block_diagram(
     - Base plate and 3-point strike/dip orientation pins.
     - `show_fault_plane=True`: red fault trace where the fault plane cuts the top surface and the side walls
       facing the viewer (the plane itself is inside the opaque block); the legend lists the fault only then.
+    - `section_xy=(start_xy, end_xy)`: optional A–A′ surface trace marked on the solid block top.
     """
     dem: GeoGrid = block_model["dem"]
     xs = dem.x_coords()
@@ -1025,6 +1103,9 @@ def plot_3d_block_diagram(
     ax.set_zlabel("Elevation (m NAVD88)", labelpad=6)
     if title:
         ax.set_title(title, fontweight="bold", pad=10)
+    if section_xy is not None:
+        mark_section_on_block(ax, block_model, section_xy[0], section_xy[1])
+
     if show_legend:
         _add_unit_legend(
             ax,
@@ -1253,6 +1334,81 @@ def plot_3d_fence_diagram(
     return fig, ax
 
 
+def plot_3d_block_and_section(
+    block_model: dict[str, Any],
+    start_xy: tuple[float, float],
+    end_xy: tuple[float, float],
+    *,
+    vertical_exaggeration: float = 1.65,
+    block_azimuth_deg: float = -58.0,
+    block_elevation_deg: float = 28.0,
+    section_azimuth_deg: float | None = None,
+    section_elevation_deg: float = 22.0,
+    n_samples: int = 160,
+    show_fault_plane: bool = True,
+    top_stride: int = 2,
+    wall_stride: int = 1,
+    titles: tuple[str, str] | None = None,
+) -> tuple[Any, tuple[Any, Any]]:
+    """
+    README-style pair: solid volumetric 3D block (A–A′ marked) | matching faulted section cut.
+
+    Left uses the full opaque block mesh with the A–A′ surface trace marked. Right shows only
+    that same transect as a 3D fence with the reconstructed fault plane, from a different
+    camera so the cut face is readable (comparable to the 2D section). No unfaulted twin,
+    no extra B–B′ / C–C′ fences.
+    """
+    dem: GeoGrid = block_model["dem"]
+    xa, ya = (float(start_xy[0]), float(start_xy[1]))
+    xb, yb = (float(end_xy[0]), float(end_xy[1]))
+    section_az = float(np.rad2deg(np.arctan2(xb - xa, yb - ya)) % 360.0)
+    # View along the section line so the vertical cut face faces the camera.
+    if section_azimuth_deg is None:
+        section_azimuth_deg = float((section_az + 180.0) % 360.0 - 180.0)
+
+    fences = slice_3d_fence_diagram(
+        block_model, transects=[(start_xy, end_xy)], n_samples=n_samples
+    )
+    fences[0]["name"] = "Fence A-A'"
+
+    if titles is None:
+        titles = (
+            "(a) 3D geologic block with A–A′ section location",
+            "(b) Matching 3D section A–A′ (published ~50° SW thrust; tip/throw inferred)",
+        )
+
+    fig = plt.figure(figsize=(14.5, 6.6), layout="constrained")
+    ax0 = fig.add_subplot(121, projection="3d")
+    ax1 = fig.add_subplot(122, projection="3d")
+    plot_3d_block_diagram(
+        block_model,
+        vertical_exaggeration=vertical_exaggeration,
+        azimuth_deg=block_azimuth_deg,
+        elevation_deg=block_elevation_deg,
+        top_stride=top_stride,
+        wall_stride=wall_stride,
+        show_fault_plane=False,
+        show_legend=False,
+        ax=ax0,
+        title=titles[0],
+        section_xy=(start_xy, end_xy),
+    )
+    plot_3d_fence_diagram(
+        block_model,
+        fence_panels=fences,
+        vertical_exaggeration=vertical_exaggeration,
+        azimuth_deg=section_azimuth_deg,
+        elevation_deg=section_elevation_deg,
+        show_fault_plane=show_fault_plane,
+        show_wireframe_surface=True,
+        show_legend=True,
+        ax=ax1,
+        title=titles[1],
+    )
+    return fig, (ax0, ax1)
+
+
+# Backward-compatible alias (older notebooks/tests). Prefer `plot_3d_block_and_section`.
 def plot_3d_section_comparison(
     block_unfaulted: dict[str, Any],
     block_faulted: dict[str, Any],
@@ -1266,61 +1422,18 @@ def plot_3d_section_comparison(
     show_fault_plane: bool = True,
     titles: tuple[str, str] | None = None,
 ) -> tuple[Any, tuple[Any, Any]]:
-    """
-    Side-by-side 3D A–A' section cuts: unfaulted vs reconstructed fault (with optional fault plane).
-
-    Camera defaults look along the section strike so the cut face is readable and comparable
-    to 2D `plot_geological_cross_section` panels. Only this one transect is sliced — no extra
-    hinge or W–E fences.
-    """
-    dem: GeoGrid = block_unfaulted["dem"]
-    xa, ya = (float(start_xy[0]), float(start_xy[1]))
-    xb, yb = (float(end_xy[0]), float(end_xy[1]))
-    section_az = float(np.rad2deg(np.arctan2(xb - xa, yb - ya)) % 360.0)
-    # View along the section line so the vertical cut face faces the camera.
-    if azimuth_deg is None:
-        azimuth_deg = float((section_az + 180.0) % 360.0 - 180.0)
-
-    transect = [(start_xy, end_xy)]
-    fences_u = slice_3d_fence_diagram(block_unfaulted, transects=transect, n_samples=n_samples)
-    fences_f = slice_3d_fence_diagram(block_faulted, transects=transect, n_samples=n_samples)
-    fences_u[0]["name"] = "Fence A-A'"
-    fences_f[0]["name"] = "Fence A-A'"
-
-    if titles is None:
-        titles = (
-            "(a) 3D section A–A' (no fault)",
-            "(b) 3D section A–A' with reconstructed basement thrust",
-        )
-
-    fig = plt.figure(figsize=(14.5, 6.4), layout="constrained")
-    ax0 = fig.add_subplot(121, projection="3d")
-    ax1 = fig.add_subplot(122, projection="3d")
-    plot_3d_fence_diagram(
-        block_unfaulted,
-        fence_panels=fences_u,
-        vertical_exaggeration=vertical_exaggeration,
-        azimuth_deg=azimuth_deg,
-        elevation_deg=elevation_deg,
-        show_fault_plane=False,
-        show_wireframe_surface=True,
-        show_legend=False,
-        ax=ax0,
-        title=titles[0],
-    )
-    plot_3d_fence_diagram(
+    """Deprecated alias: solid faulted block + matching faulted A–A′ section (no unfaulted twin)."""
+    return plot_3d_block_and_section(
         block_faulted,
-        fence_panels=fences_f,
+        start_xy,
+        end_xy,
         vertical_exaggeration=vertical_exaggeration,
-        azimuth_deg=azimuth_deg,
-        elevation_deg=elevation_deg,
+        section_azimuth_deg=azimuth_deg,
+        section_elevation_deg=elevation_deg,
+        n_samples=n_samples,
         show_fault_plane=show_fault_plane,
-        show_wireframe_surface=True,
-        show_legend=True,
-        ax=ax1,
-        title=titles[1],
+        titles=titles,
     )
-    return fig, (ax0, ax1)
 
 
 def export_interactive_block_html(

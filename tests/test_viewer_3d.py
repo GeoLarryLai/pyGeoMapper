@@ -235,12 +235,12 @@ def test_3d_renderers_and_forge3d_adapter():
     assert red, "fault trace not drawn"
     plt.close(fig4)
 
-    block_u = viewer_3d.build_3d_block_diagram(
-        dem=dem, geol_labels=geol, units_metadata=units_meta, z_bottom=800.0, nz=20,
-        fault_spec=fault, include_fault=False,
+    fig5, axes5 = viewer_3d.plot_3d_block_and_section(
+        block_f, start_xy, end_xy, n_samples=80, top_stride=4, wall_stride=2
     )
-    fig5, _ = viewer_3d.plot_3d_section_comparison(block_u, block_f, start_xy, end_xy, n_samples=80)
     assert len(fig5.axes) >= 2
+    # Left solid block should carry the A–A′ surface mark (black polyline + labels).
+    assert any(ln.get_color() in ("#111111", "k", "black") for ln in axes5[0].get_lines())
     plt.close(fig5)
 
 

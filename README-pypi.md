@@ -79,10 +79,10 @@ cwt = terrain_analysis.compute_multiscale_complexity(dem2)          # terrain ro
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/cross_section.png)
-*Sheep Mountain A–A′ from 3-point bed attitudes, without and with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
+*Sheep Mountain A–A′ from 3-point bed attitudes with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
 
 ![3D geological block diagram](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/3d_block_diagram.png)
-*Same A–A′ cuts in 3D — no fault vs reconstructed basement thrust with the fault plane shown.*
+*Solid 3D geologic block with A–A′ marked (left) and the matching faulted 3D section with reconstructed basement-thrust plane (right).*
 
 Five executed notebooks in `notebooks/` of the [repository](https://github.com/GeoLarryLai/pyGeoMapper) walk through every module with public data:
 
