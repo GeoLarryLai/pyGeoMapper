@@ -191,8 +191,42 @@ def test_geological_cross_section_geometry_and_fault_offset() -> None:
     plt.close(fig)
 
 
+def test_cross_section_contacts_follow_fault_and_stay_in_order() -> None:
+    """Projected contacts agree with the unit colors on both sides of a dipping fault (either dip direction),
+    and horizons stay in stratigraphic order (older below younger)."""
+    dem = raster_io.load_geotiff(DATA_DIR / "sheep_mtn_dem_3dep.tif")
+    geol = raster_io.load_geotiff(DATA_DIR / "sheep_mtn_geol_units.tif")
+    attitudes = cross_section.estimate_contact_attitudes(
+        geol, dem, window_m=400.0, min_points=5, min_relief_m=5.0, min_r2=0.45
+    )
+    for dip in (65.0, -65.0):
+        sec = cross_section.build_geological_cross_section(
+            dem, geol, start_xy=(726900.0, 4942800.0), end_xy=(729700.0, 4944600.0), attitudes=attitudes,
+            depth_m=350.0, faults=[{"distance_m": 1350.0, "dip_deg": dip, "throw_m": 55.0, "name": "F"}],
+        )
+        pcs = sec["projected_contacts"]
+        upper_units = [max(pc["unit_a"], pc["unit_b"]) for pc in pcs]
+        assert upper_units == sorted(upper_units), "horizons out of stratigraphic order"
+        zl, units, z_topo = sec["z_levels_m"], sec["subsurface_units"], sec["z_topo_m"]
+        step = float(zl[1] - zl[0])
+        checked = agree = 0
+        for pc in pcs:
+            lower, upper = min(pc["unit_a"], pc["unit_b"]), max(pc["unit_a"], pc["unit_b"])
+            for z_branch in pc["z_subsurface_branches_m"]:
+                inside = np.isfinite(z_branch) & (z_branch < z_topo - 25.0) & (z_branch > zl[0] + 2.0 * step)
+                for j in np.where(inside)[0]:
+                    i_below = int(np.searchsorted(zl, z_branch[j] - 2.0 * step))
+                    i_above = int(np.searchsorted(zl, z_branch[j] + 2.0 * step))
+                    u_below, u_above = units[i_below, j], units[i_above, j]
+                    if np.isfinite(u_below) and np.isfinite(u_above):
+                        checked += 1
+                        agree += int(u_below <= lower and u_above >= upper)
+        assert checked > 200 and agree / checked > 0.95, (dip, checked, agree)
+
+
 def test_notebooks_2_and_3_executed_cleanly() -> None:
-    """Verify Notebooks 2 and 3 are executed in-place with zero error outputs and saved figures."""
+    """Saved notebook JSON only: every code cell has an execution count, no error outputs, and the figures exist.
+    This does NOT re-run the notebooks; re-execute them (e.g. `jupyter nbconvert --execute --inplace`) before a release."""
     for nb_name in (
         "pyGeoMapper_2_terrain_complexity_and_cwt.ipynb",
         "pyGeoMapper_3_auto_mapping_and_cross_section.ipynb",
@@ -207,6 +241,7 @@ def test_notebooks_2_and_3_executed_cleanly() -> None:
                     assert out.get("output_type") != "error", f"{nb_name} cell {idx} had error"
 
     for fig_name in (
+        "oso_cwt_change.png",
         "cwt_multiscale.png",
         "auto_mapping_validation.png",
         "cross_section.png",

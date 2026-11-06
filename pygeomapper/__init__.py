@@ -11,6 +11,8 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 from . import (
     auto_mapping,
     cross_section,
+    insar3d,
+    plotting,
     raster_io,
     spectral_indices,
     surface_change,
@@ -27,7 +29,7 @@ except ImportError:  # pragma: no cover
     _core = None
     HAS_RUST_CORE = False
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
@@ -41,4 +43,6 @@ __all__ = [
     "auto_mapping",
     "cross_section",
     "viewer_3d",
+    "insar3d",
+    "plotting",
 ]

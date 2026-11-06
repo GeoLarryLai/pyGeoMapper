@@ -27,6 +27,7 @@ open-source scientific software and public datasets (each under its own license)
 
 Example data in example_data/ is derived from public-domain / open-access sources
 (USGS 3DEP, USGS SGMC, ESA/Copernicus Sentinel-2 L2A & GLO-30 DEM via AWS Earth Search,
+COMET LiCSAR Sentinel-1 products (CC-BY 4.0), NASA ITS_LIVE, USDA NAIP,
 and AlphaEarth embedding representations); see example_data/SOURCES.txt for exact provenance and terms.
 
 License compatibility: the third-party software above is under permissive licenses

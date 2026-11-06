@@ -369,7 +369,8 @@ def test_real_oso_example_data_and_viewer_3d():
 
 
 def test_notebook_1_executed_cleanly():
-    """Verify Notebook 1 exists, has executed outputs, and contains zero error outputs."""
+    """Saved notebook JSON only: every code cell has an execution count and no error outputs.
+    This does NOT re-run the notebook; re-execute it (e.g. `jupyter nbconvert --execute --inplace`) before a release."""
     nb_path = REPO_ROOT / "notebooks" / "pyGeoMapper_1_spectral_and_surface_change.ipynb"
     assert nb_path.exists()
     nb = nbformat.read(nb_path, as_version=4)

@@ -200,9 +200,22 @@ def test_3d_renderers_and_forge3d_adapter():
     fig3, _ = viewer_3d.plot_3d_fence_diagram(block)
     plt.close(fig3)
 
+    # Fault trace on the top surface and front walls when show_fault_plane=True (NE-dipping, strike 320)
+    xs, ys = dem.x_coords(), dem.y_coords()
+    fault = {"x0": float(xs.mean()), "y0": float(ys.mean()), "z0": 1300.0, "strike_deg": 320.0, "dip_deg": 58.0,
+             "throw_m": 75.0}
+    block_f = viewer_3d.build_3d_block_diagram(
+        dem=dem, geol_labels=geol, units_metadata=units_meta, z_bottom=800.0, nz=20, fault_spec=fault
+    )
+    fig4, ax4 = viewer_3d.plot_3d_block_diagram(block_f, top_stride=4, wall_stride=2, show_fault_plane=True)
+    red = [ln for ln in ax4.get_lines() if ln.get_color() == "#d62728"]
+    assert red, "fault trace not drawn"
+    plt.close(fig4)
+
 
 def test_notebook_4_executed_cleanly():
-    """Verify Notebook 4 and its 3D output artifacts exist and have non-empty outputs."""
+    """Saved notebook JSON only: every code cell has an execution count and output, and the figures exist.
+    This does NOT re-run the notebook; `outputs/` (HTML viewer, meshes) is untracked, so run notebook 4 locally first."""
     nb_path = REPO_ROOT / "notebooks" / "pyGeoMapper_4_3d_block_diagram_and_viewer.ipynb"
     assert nb_path.exists()
     nb = json.loads(nb_path.read_text(encoding="utf-8"))

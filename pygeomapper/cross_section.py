@@ -16,6 +16,7 @@ Includes:
 
 from __future__ import annotations
 
+from itertools import product
 from typing import Any, Sequence
 
 import matplotlib.colors as mcolors
@@ -181,6 +182,12 @@ def compute_apparent_dip(
     )
 
 
+def _in_hanging_wall(fault: dict[str, float], s: np.ndarray, z: np.ndarray) -> np.ndarray:
+    """True where section point `(s, z)` lies on the hanging-wall side of a planar section fault."""
+    s_fault = fault["s0"] + (fault["z0"] - z) * fault["cot_dip"]
+    return s >= s_fault if fault["dip_deg"] >= 0 else s <= s_fault
+
+
 def build_geological_cross_section(
     dem: GeoGrid,
     geol_labels: GeoGrid,
@@ -206,11 +213,13 @@ def build_geological_cross_section(
     ----------
     enforce_superposition : bool, default True
         When True and unit IDs are ordered oldest (`0`) to youngest (`K-1`), ensures the local
-        apparent dip sign at each contact crossing dips toward the younger stratigraphic unit.
+        apparent dip sign at each contact crossing dips toward the younger stratigraphic unit, and
+        keeps the projected horizons in stratigraphic order (each unit at least 5 m thick).
     faults : sequence of dict, optional
         Each fault dict may specify `{'distance_m': float, 'dip_deg': float, 'throw_m': float, 'name': str}`,
         where `dip_deg` is apparent dip in section (>0 dipping right, <0 dipping left) and `throw_m`
-        is vertical structural offset of the hanging wall relative to the footwall.
+        is vertical structural offset of the hanging wall relative to the footwall. Unit colors and
+        projected contacts are both offset along the dipping fault plane (not a vertical step).
     """
     topo_prof = extract_swath_profile(
         dem,
@@ -340,6 +349,7 @@ def build_geological_cross_section(
     fault_offset_2d = np.zeros_like(ss_2d)
     fault_offset_surf = np.zeros_like(dist_m)
     fault_traces: list[dict[str, Any]] = []
+    fault_geoms: list[dict[str, float]] = []
     if faults:
         for f in faults:
             f_s0 = float(f["distance_m"])
@@ -349,11 +359,10 @@ def build_geological_cross_section(
             f_z0 = float(np.interp(f_s0, dist_m, z_topo))
             cot_dip = 1.0 / np.tan(np.deg2rad(f_dip if abs(f_dip) > 5.0 else 65.0))
             # Fault trace position s_fault(z) = f_s0 + (f_z0 - z) * cot_dip
-            s_fault_2d = f_s0 + (f_z0 - zz_2d) * cot_dip
-            hanging_mask = ss_2d >= s_fault_2d if f_dip >= 0 else ss_2d <= s_fault_2d
-            fault_offset_2d[hanging_mask] += f_throw
-            surf_hang = dist_m >= f_s0 if f_dip >= 0 else dist_m <= f_s0
-            fault_offset_surf[surf_hang] += f_throw
+            geom = {"s0": f_s0, "z0": f_z0, "cot_dip": cot_dip, "dip_deg": f_dip, "throw_m": f_throw}
+            fault_geoms.append(geom)
+            fault_offset_2d[_in_hanging_wall(geom, ss_2d, zz_2d)] += f_throw
+            fault_offset_surf[_in_hanging_wall(geom, dist_m, z_topo)] += f_throw
 
             z_trace = np.linspace(z_min, f_z0, 60)
             s_trace = f_s0 + (f_z0 - z_trace) * cot_dip
@@ -391,6 +400,15 @@ def build_geological_cross_section(
     boundary_levels: list[tuple[float, int, int]] = []
     for (ua, ub), z_list in sorted(unit_thresholds.items()):
         boundary_levels.append((float(np.mean(z_list)), ua, ub))
+    if enforce_superposition and boundary_levels:
+        # Older-below-younger: order horizons by the unit they cap and keep each unit >= 5 m thick
+        boundary_levels.sort(key=lambda item: (max(item[1], item[2]), min(item[1], item[2])))
+        ordered: list[tuple[float, int, int]] = []
+        for b_zeta, ua, ub in boundary_levels:
+            if ordered:
+                b_zeta = max(b_zeta, ordered[-1][0] + 5.0)
+            ordered.append((b_zeta, ua, ub))
+        boundary_levels = ordered
     boundary_levels.sort(key=lambda item: item[0])
 
     for j in range(len(dist_m)):
@@ -413,10 +431,21 @@ def build_geological_cross_section(
         else:
             subsurface_units[below, j] = float(surf_units[j])
 
-    # Project bedding contact curves z_contact(s) = zeta_c + h_struct(s) + fault_offset_surf(s)
+    # Project bedding contact curves z_contact(s) = zeta_c + h_struct(s) + fault_offset(s, z_contact).
+    # Each fault-block combination gives one branch, kept only where (s, z) really lies in that block, so
+    # contacts are cut along the dipping fault plane (and repeated beneath a reverse fault) like the unit colors.
     projected_contacts: list[dict[str, Any]] = []
     for (b_zeta, ua, ub) in boundary_levels:
-        z_curve = b_zeta + h_struct + fault_offset_surf
+        branches: list[np.ndarray] = []
+        for in_hw in product((False, True), repeat=len(fault_geoms)):
+            z_b = b_zeta + h_struct + sum(g["throw_m"] for g, on in zip(fault_geoms, in_hw) if on)
+            valid = np.ones(dist_m.shape, dtype=bool)
+            for g, on in zip(fault_geoms, in_hw):
+                valid &= _in_hanging_wall(g, dist_m, z_b) == on
+            branches.append(np.where(valid, z_b, np.nan))
+        z_curve = branches[0].copy()
+        for z_b in branches[1:]:
+            z_curve = np.where(np.isfinite(z_curve), z_curve, z_b)
         # Mask curve where it rises above the topographic surface (eroded in air)
         z_curve_sub = np.where(z_curve <= z_topo + 5.0, z_curve, np.nan)
         z_curve_air = np.where(z_curve > z_topo, z_curve, np.nan)
@@ -427,6 +456,8 @@ def build_geological_cross_section(
                 "zeta_m": b_zeta,
                 "z_subsurface_m": z_curve_sub,
                 "z_projected_air_m": z_curve_air,
+                "z_subsurface_branches_m": [np.where(z_b <= z_topo + 5.0, z_b, np.nan) for z_b in branches],
+                "z_projected_air_branches_m": [np.where(z_b > z_topo, z_b, np.nan) for z_b in branches],
             }
         )
 
@@ -523,26 +554,27 @@ def plot_geological_cross_section(
 
     # Plot projected subsurface bedding contacts and dashed above-surface fold projections
     for pc in section.get("projected_contacts", []):
-        ax.plot(
-            dist_m,
-            pc["z_subsurface_m"],
-            color="#1f1f1f",
-            linewidth=1.25,
-            linestyle="-",
-            alpha=0.85,
-        )
-        if show_eroded_projection:
-            z_air = pc["z_projected_air_m"]
-            z_cap = np.nanmax(z_topo) + 140.0
-            z_air_clipped = np.where(z_air <= z_cap, z_air, np.nan)
+        for z_sub in pc.get("z_subsurface_branches_m", [pc["z_subsurface_m"]]):
             ax.plot(
                 dist_m,
-                z_air_clipped,
-                color="#555555",
-                linewidth=0.95,
-                linestyle="--",
-                alpha=0.60,
+                z_sub,
+                color="#1f1f1f",
+                linewidth=1.25,
+                linestyle="-",
+                alpha=0.85,
             )
+        if show_eroded_projection:
+            z_cap = np.nanmax(z_topo) + 140.0
+            for z_air in pc.get("z_projected_air_branches_m", [pc["z_projected_air_m"]]):
+                z_air_clipped = np.where(z_air <= z_cap, z_air, np.nan)
+                ax.plot(
+                    dist_m,
+                    z_air_clipped,
+                    color="#555555",
+                    linewidth=0.95,
+                    linestyle="--",
+                    alpha=0.60,
+                )
 
     # Plot fault traces if present
     for ft in section.get("fault_traces", []):

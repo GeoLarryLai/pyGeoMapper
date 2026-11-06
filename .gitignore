@@ -26,3 +26,6 @@ Thumbs.db
 
 # Regenerated 3D meshes (notebook 4)
 outputs/
+
+# Internal review ledger; do not ship
+AI_EDITING_LOG.md

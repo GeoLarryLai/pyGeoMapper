@@ -20,5 +20,6 @@ dependencies:
   - rust
   - pip
   - pip:
-      - forge3d
       - pywbt
+      # 3D terrain renderer, installed with pip (not on conda-forge); viewer_3d falls back without it
+      - forge3d

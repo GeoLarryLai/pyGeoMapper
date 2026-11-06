@@ -36,6 +36,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -252,6 +253,7 @@ def plot_3d_terrain_drape(
     ax.set_xlabel("Relative Easting (m)")
     ax.set_ylabel("Relative Northing (m)")
     ax.set_zlabel(f"Elevation ({dem.units})")
+    ax.zaxis.set_major_locator(MaxNLocator(nbins=4))
     if title:
         ax.set_title(title, fontweight="bold", pad=10)
 
@@ -261,7 +263,7 @@ def plot_3d_terrain_drape(
         hi = float(np.percentile(vals, 98.0)) if vmax is None else float(vmax)
         sm = cm.ScalarMappable(norm=mcolors.Normalize(vmin=lo, vmax=hi), cmap=plt.get_cmap(cmap))
         sm.set_array([])
-        fig.colorbar(sm, ax=ax, shrink=0.58, pad=0.08, label=cbar_label)
+        fig.colorbar(sm, ax=ax, shrink=0.58, pad=0.16, label=cbar_label)
 
     return fig, ax
 
@@ -824,6 +826,57 @@ def _plot_3d_attitude_discs(
         )
 
 
+def _plot_3d_fault_traces(
+    ax: Any,
+    block_model: dict[str, Any],
+    x_origin: float,
+    y_origin: float,
+    azimuth_deg: float,
+    color: str = "#d62728",
+    linewidth: float = 2.6,
+) -> None:
+    """
+    Draw where the fault plane cuts the block: its trace on the top topographic surface and on the side
+    walls that face the viewer. The plane itself lies inside the opaque block, so it is not drawn.
+    """
+    import contourpy
+
+    dem: GeoGrid = block_model["dem"]
+    z_flt = np.asarray(block_model.get("fault_surface_z"), dtype=np.float64)
+    if block_model.get("fault_spec") is None or z_flt.shape != dem.shape or not np.isfinite(z_flt).any():
+        return
+    xs, ys = dem.x_coords(), dem.y_coords()
+    z_dem = np.asarray(dem.data, dtype=np.float64)
+    z_bot = float(block_model["z_bottom"])
+    order = np.argsort(ys)
+    ys_inc, zd, zf = ys[order], z_dem[order], z_flt[order]
+
+    # Top-surface trace: zero contour of (z_dem - z_fault), lifted slightly so it is not hidden by the drape
+    gen = contourpy.contour_generator(x=xs, y=ys_inc, z=np.nan_to_num(zd - zf, nan=0.0))
+    for line in gen.lines(0.0):
+        if len(line) < 2:
+            continue
+        ci = np.interp(line[:, 0], xs, np.arange(len(xs)))
+        ri = np.interp(line[:, 1], ys_inc, np.arange(len(ys_inc)))
+        z_line = zd[np.round(ri).astype(int), np.round(ci).astype(int)] + 6.0
+        ax.plot(line[:, 0] - x_origin, line[:, 1] - y_origin, z_line, color=color, linewidth=linewidth, zorder=18)
+
+    # Side-wall traces on the walls facing the camera (outward normal toward the eye)
+    az = np.deg2rad(float(azimuth_deg))
+    eye = (np.cos(az), np.sin(az))
+    walls = [
+        ((-1.0, 0.0), np.full_like(ys_inc, xs[0]), ys_inc, zd[:, 0], zf[:, 0]),
+        ((1.0, 0.0), np.full_like(ys_inc, xs[-1]), ys_inc, zd[:, -1], zf[:, -1]),
+        ((0.0, -1.0), xs, np.full_like(xs, ys_inc[0]), zd[0, :], zf[0, :]),
+        ((0.0, 1.0), xs, np.full_like(xs, ys_inc[-1]), zd[-1, :], zf[-1, :]),
+    ]
+    for normal, wx, wy, top, z_wall in walls:
+        if normal[0] * eye[0] + normal[1] * eye[1] <= 0.0:
+            continue
+        z_line = np.where((z_wall >= z_bot) & (z_wall <= top), z_wall, np.nan)
+        ax.plot(wx - x_origin, wy - y_origin, z_line, color=color, linewidth=linewidth, zorder=18)
+
+
 def _add_unit_legend(ax: Any, units_metadata: Sequence[dict[str, Any]], include_fault: bool = True) -> None:
     handles = [
         Patch(
@@ -873,7 +926,9 @@ def plot_3d_block_diagram(
     Render a publication-quality 3D perspective geological block diagram showing:
     - Top topographic surface draped with geological units (or custom RGB/RGBA drape)
     - Four vertical cross-section side walls (South, North, West, East) down to `z_bottom`
-    - Base plate and optional 3D fault plane & 3-point strike/dip orientation pins.
+    - Base plate and 3-point strike/dip orientation pins.
+    - `show_fault_plane=True`: red fault trace where the fault plane cuts the top surface and the side walls
+      facing the viewer (the plane itself is inside the opaque block); the legend lists the fault only then.
     """
     dem: GeoGrid = block_model["dem"]
     xs = dem.x_coords()
@@ -944,16 +999,7 @@ def plot_3d_block_diagram(
     ax.plot(xx[:, -1], yy[:, -1], zz[:, -1], color="#1a1a1a", linewidth=0.9, zorder=15)
 
     if show_fault_plane:
-        _render_mesh_poly3d(
-            ax,
-            block_model["mesh"],
-            x_origin=x_min,
-            y_origin=y_min,
-            include_face_groups=[7],
-            face_stride=2,
-            alpha=0.55,
-            edge_alpha=0.15,
-        )
+        _plot_3d_fault_traces(ax, block_model, x_origin=x_min, y_origin=y_min, azimuth_deg=azimuth_deg)
 
     if show_attitudes and block_model.get("attitudes"):
         _plot_3d_attitude_discs(ax, block_model["attitudes"], x_origin=x_min, y_origin=y_min)
@@ -976,7 +1022,7 @@ def plot_3d_block_diagram(
         _add_unit_legend(
             ax,
             block_model["units_metadata"],
-            include_fault=block_model.get("fault_spec") is not None,
+            include_fault=show_fault_plane and block_model.get("fault_spec") is not None,
         )
     return fig, ax
 

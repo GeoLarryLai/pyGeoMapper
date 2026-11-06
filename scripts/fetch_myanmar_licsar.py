@@ -11,9 +11,10 @@ Sources (public, no login; contains modified Copernicus Sentinel-1 data processe
   * Event offset-tracking mosaics + LOS unit vectors:
     https://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products/EQ/us7000pn9s/
     -> 106D/070A.geo.azi.masked.tif, .geo.rng.masked.tif (m), .geo.E/N/U.tif (LOS unit vector, ground->satellite)
-Outputs (example_data/hazards):
+Outputs (example_data/hazards, full 0.001 deg resolution):
   myanmar_licsar_106D_ifg.tif     : int16 bands wrapped_phase (1e-4 rad), unwrapped_los_m (0.1 mm), coherence (0-1 *1e4)
   myanmar_licsar_offsets.tif      : int16 (cm) azi_106D, rng_106D, azi_070A, rng_070A, u_north_from_azi
+The repository ships lean 0.002 deg copies; run scripts/make_myanmar_demo.py after this script to rebuild them.
 """
 from pathlib import Path
 import subprocess
@@ -70,9 +71,9 @@ def mosaic(ext, align=False):
 
 
 def write(path, bands, names, scale, tags):
-    with rasterio.open(path, "w", driver="COG", height=H, width=W, count=len(bands), dtype="int16",
+    with rasterio.open(path, "w", driver="GTiff", height=H, width=W, count=len(bands), dtype="int16",
                        crs="EPSG:4326", transform=DST_T, nodata=-32768, compress="DEFLATE", predictor=2,
-                       level=9, blocksize=512) as d:
+                       zlevel=9, tiled=True, blockxsize=512, blockysize=512) as d:
         for i, (b, n, sc) in enumerate(zip(bands, names, scale), 1):
             q = np.where(np.isfinite(b), np.clip(np.round(b / sc), -32767, 32767), -32768).astype(np.int16)
             d.write(q, i)

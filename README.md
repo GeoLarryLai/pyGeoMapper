@@ -21,6 +21,8 @@ git clone https://github.com/GeoLarryLai/pyGeoMapper.git && cd pyGeoMapper
 pip install maturin && maturin develop --release
 ```
 
+`pip install pygeomapper` includes the `forge3d` 3D terrain renderer. If you installed from conda and the renderer is missing, run `pip install forge3d`; otherwise `viewer_3d` falls back to its built-in renderer automatically.
+
 ## Citation
 
 Lai, L.S.-H. (2026) pyGeoMapper. *Zenodo*, [https://doi.org/10.5281/zenodo.23832020](https://doi.org/10.5281/zenodo.23832020)
@@ -36,11 +38,11 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 [Horton et al. (2017)](https://doi.org/10.3133/ds1052). Data sources: `example_data/SOURCES.txt`, `NOTICE`.
 
 ![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
-*A DEM of Difference and a spectral change map, the two basic ways the package spots change on the ground.*
+*DEM of Difference (red = erosion, blue = deposit) and spectral change after the 2014 Oso landslide, the two basic ways the package spots change on the ground.*
 
 ## What it can do
 
-- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement
+- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement (wrapped fringes on imagery, horizontal and vertical motion)
 - Compute spectral indices (NDVI, NBR, NDWI, mineral ratios) and terrain metrics (slope, curvature, roughness, multiscale CWT complexity)
 - Make unsupervised and supervised geologic unit maps, with spatial-block holdout accuracy
 - Draw cross-sections and 3D block, cutaway and fence diagrams, and view them in an offline WebGL viewer
@@ -48,17 +50,20 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 
 ## Examples
 
-![Earthquake displacement](image/readme_myanmar_earthquake.jpg)
-*Ground displacement and offsets from the 2025 Mw 7.7 Myanmar earthquake, from Sentinel-1 (COMET LiCSAR).*
+![Myanmar 2025 earthquake in 3D](image/myanmar_insar_3d.jpg)
+*The 2025 Mw 7.7 Myanmar earthquake from real Sentinel-1 data (COMET LiCSAR): interferogram fringes on pre-event Sentinel-2 imagery, horizontal motion with arrows, and vertical motion.*
+
+![Oso landslide roughness change](image/oso_cwt_change.png)
+*Terrain roughness (multiscale 2D wavelet complexity) before and after the 2014 Oso landslide, and the change.*
 
 ![Auto-mapping validation](image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
 
 ![Cross-section](image/cross_section.png)
-*A Sheep Mountain Anticline cross-section with bed attitudes from 3-point solutions.*
+*A Sheep Mountain Anticline cross-section from 3-point bed attitudes, without and with a NE-dipping forelimb reverse fault.*
 
 ![3D geological block diagram](image/3d_block_diagram.png)
-*A 3D block diagram of the same area.*
+*A 3D block diagram of the same area; the red line is where the thrust fault cuts the surface and the front walls.*
 
 Five executed notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).

@@ -89,41 +89,62 @@ Study Area 2:
 Study Area Suite 3 (Multi-Hazard & Land-Change Comparison Benchmark, `example_data/hazards/`):
   Grid Geometry: 112 x 112 pixels at 20 m spacing (2.24 km x 2.24 km per site), DEFLATE-compressed float32 GeoTIFFs.
 
+  STATUS NOTE (0.2.0 review, needs confirmation by the original author): the Regime 3-5 inputs below
+  (`flood_*`, `wildfire_*`, `agri_urban_*`) look SYNTHETIC / MODELED when plotted (for example the wildfire
+  Sentinel-2 image is a uniform field with a perfectly round burn scar), so they are NOT real scenes of the
+  named events. Treat the "Site" and "Sources" lines of items 10-12 as the intended scenario or recipe, not as
+  verified provenance, until the real products are fetched or the generating script is documented here.
+
 8. Regime 1 — Ground deformation: see the Myanmar, Chi-Chi, Kilauea, Jakobshavn and Slumgullion entries below. (The Ridgecrest 2019 data were removed.)
 
 9. Regime 2 — Catastrophic Landslide Mass-Wasting (`oso_*`, EPSG:32610, UTM Zone 10N)
    - Site: 2014 Oso (SR 530) Landslide, North Fork Stillaguamish Valley, Washington (Items 1-4 above).
 
-10. Regime 3 — Overbank Flood Inundation & Crevasse Splay (`flood_*.tif`, EPSG:32615, UTM Zone 15N)
-   - Site: 2019 Missouri River Alluvial Floodplain Levee-Breach Corridor near Percival, Iowa
-   - UTM Origin (top-left x0, y0): (268000.0, 4504240.0), Elevation range: 276.8 m to 285.9 m NAVD88
-   - Sources: USGS 3DEP floodplain DEM (`flood_dem_pre.tif`, `flood_dem_post.tif`) and 6-band Sentinel-2 L2A
-     reflectance (`flood_s2_pre.tif`, `flood_s2_post.tif`).
+10-12. Regimes 3-5 (REAL, 0.2.0) - `flood_*`, `wildfire_*`, `agri_urban_*` in hazards/. Built by
+   scripts/fetch_surface_change_cases.py: 5 km x 5 km UTM windows at 20 m (250 x 250 px), Sentinel-2 L2A
+   6-band float32 surface reflectance (blue, green, red, nir, swir1, swir2; 10 m bands averaged to 20 m),
+   from AWS Element84 Earth Search (https://earth-search.aws.element84.com/v1, collection sentinel-2-l2a, no login).
+   DEM: Copernicus GLO-30 resampled (bilinear) to the same 20 m grid. ONE DEM vintage is written as both
+   `*_dem_pre.tif` and `*_dem_post.tif`, so the DEM of Difference is zero by construction; these cases show
+   spectral change only (no measured elevation change, no splay or quarry cut/fill).
+   - Case 3 flood (EPSG:32610): February 2019 Yolo Bypass flood (Fremont Weir overflow after the mid-February
+     atmospheric-river storms), Yolo County beside West Sacramento, California. Bounds (619512, 4264161, 624512, 4269161).
+     Pre S2B_10SFH_20190125_0_L2A (2019-01-25), co-flood S2A_10SFH_20190219_0_L2A (2019-02-19).
+     Replaces the 2019 Missouri River (Percival, IA) window: that flood water was too sediment-laden for the
+     green-vs-NIR NDWI to rise (green ~0.09 < NIR ~0.11 on flooded pixels).
+   - Case 4 wildfire (EPSG:32610): 2020 Holiday Farm Fire (ignited 2020-09-07), McKenzie River canyon, Lane County,
+     Oregon. Bounds (544620, 4886620, 549620, 4891620). Pre S2A_10TEP_20200726_1_L2A (2020-07-26),
+     post S2B_10TEP_20200929_1_L2A (2020-09-29).
+   - Case 5 agri-urban (EPSG:32611): center-pivot fields and suburban growth south of Kuna / Nampa, Boise Valley,
+     Idaho. Bounds (540620, 4816620, 545620, 4821620). Pre S2B_11TNJ_20170731_0_L2A (2017-07-31),
+     post S2A_11TNJ_20240709_0_L2A (2024-07-09).
+   Cases 4-5 use the 0.1.x window centres, enlarged from 2.24 km to 5 km; Case 3 is a new window.
+   "Contains modified Copernicus Sentinel data (2017-2024)". Copernicus DEM GLO-30: (c) DLR e.V. 2010-2014 and
+   (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the EU and ESA.
 
-11. Regime 4 — Montane Wildfire Burn Scar & Post-Fire Hazard (`wildfire_*.tif`, EPSG:32610, UTM Zone 10N)
-   - Site: 2020 Holiday Farm / McKenzie River Canyon Wildfire Corridor, Western Cascades, Oregon
-   - UTM Origin (top-left x0, y0): (546000.0, 4890240.0), Elevation range: 487.2 m to 1030.4 m NAVD88
-   - Sources: USGS 3DEP steep montane canyon DEM (`wildfire_dem_pre.tif`, `wildfire_dem_post.tif`) and
-     6-band Sentinel-2 L2A reflectance (`wildfire_s2_pre.tif`, `wildfire_s2_post.tif`).
-
-12. Regime 5 — Center-Pivot Agricultural & Urban/Quarry Expansion (`agri_urban_*.tif`, EPSG:32611, UTM Zone 11N)
-   - Site: Snake River Plain / Boise Valley Terrace Agricultural-Urban Transition, Idaho
-   - UTM Origin (top-left x0, y0): (542000.0, 4820240.0), Elevation range: 777.0 m to 805.7 m NAVD88
-   - Sources: USGS 3DEP terrace DEM with quarry cut/fill (`agri_urban_dem_pre.tif`, `agri_urban_dem_post.tif`)
-     and 6-band Sentinel-2 L2A reflectance (`agri_urban_s2_pre.tif`, `agri_urban_s2_post.tif`).
-
-- hazards/myanmar_eq_dem_north.tif, hazards/myanmar_eq_dem_south.tif:
-  Copernicus DEM GLO-30, 1 arc-sec (~30 m), two halves of 9540x3600 px each, covering 95.6-96.6E, 17.8-23.1N.
+- Myanmar lean copies (0.2.0): the four Myanmar files below ship downsampled (117 MB -> 19 MB) by
+  scripts/make_myanmar_demo.py. Full resolution: run scripts/fetch_myanmar_licsar.py (LiCSAR products) and
+  raster_io.fetch_copernicus_dem (DEM halves), then re-run make_myanmar_demo.py for the lean copies.
+  Notebook 5 and the tests read the pixel size from each file, so both resolutions work.
+- hazards/myanmar_eq_dem_north.tif (2.6 MB), hazards/myanmar_eq_dem_south.tif (3.0 MB):
+  Copernicus DEM GLO-30, two halves covering 95.6-96.6E, 17.8-23.1N; shipped at 3 arc-sec (~90 m, 3x3 block
+  mean, 3180x1200 px each) from the 1 arc-sec (~30 m, 9540x3600 px) originals.
   Source: https://copernicus-dem-30m.s3.amazonaws.com/ (raster_io.fetch_copernicus_dem).
   (c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the EU and ESA.
-- hazards/myanmar_licsar_106D_ifg.tif (REAL): Sentinel-1 106D interferogram 20250324_20250405.
-  Bands: wrapped_phase_rad, unwrapped_los_m, coherence; int16 with a per-band scale_factor tag; 0.001 deg grid.
+- hazards/myanmar_licsar_106D_ifg.tif (REAL, 5.3 MB): Sentinel-1 106D interferogram 20250324_20250405.
+  Bands: wrapped_phase_rad, unwrapped_los_m, coherence; int16 with a per-band scale_factor tag; shipped on a
+  0.002 deg grid (2x2 blocks of the 0.001 deg product; wrapped phase = circular mean, other bands = mean).
   Source: https://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products.public/106/
-- hazards/myanmar_licsar_offsets.tif (REAL): Sentinel-1 offset tracking for event us7000pn9s.
+- hazards/myanmar_licsar_offsets.tif (REAL, 8.2 MB): Sentinel-1 offset tracking for event us7000pn9s, 0.002 deg grid.
   Bands: azi/rng for 106D and 070A, u_north_m (2x2 solve of the two azimuth offsets), and u_east_m, u_up_m
   (weighted LSQ of all 4 offsets; sigma 0.3 m azimuth, 0.15 m range; LOS unit vectors from LiCSAR metadata geo.E/N/U).
   Source: https://gws-access.jasmin.ac.uk/public/nceo_geohazards/LiCSAR_products/EQ/us7000pn9s/
   "Contains modified Copernicus Sentinel-1 data (2025) processed by COMET LiCSAR" (Lazecky et al. 2020). CC-BY 4.0.
+- hazards/myanmar_s2_rgb_pre.tif (REAL, 2.4 MB): pre-event Sentinel-2 L2A true-color (TCI) mosaic under the rupture
+  swath, 0.002 deg grid (500x2650 px), uint8 RGB (0 = no data), ~99% coverage. Scenes 2025-01-01..2025-03-27 (< 40% cloud,
+  4 best per MGRS tile, read at the 1/16 COG overview and averaged); scene IDs in the file's `scenes` tag.
+  Source: https://earth-search.aws.element84.com/v1 (collection sentinel-2-l2a, asset `visual`), no login.
+  Script: scripts/fetch_myanmar_s2_rgb.py. "Contains modified Copernicus Sentinel data (2025)".
 - hazards/myanmar_eq_insar_gnss.tif (MODELED): screw-dislocation forward model (scripts/make_myanmar_model.py),
   used for the decomposition demo and the tests only.
 - hazards/thrust_eq_dem.tif: Copernicus GLO-30, EPSG:4326, 2448x2232 px, Central Taiwan.
