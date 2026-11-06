@@ -60,6 +60,50 @@ def colorbar_mappable(
     return sm
 
 
+def matching_width_colorbar(
+    fig: Any,
+    mappable: Any,
+    ax: Any,
+    *,
+    orientation: str = "horizontal",
+    thickness: float = 0.014,
+    pad: float = 0.028,
+    label: str | None = None,
+    label_fontsize: float = 8.5,
+    tick_fontsize: float = 7.5,
+    use_position: bool = True,
+) -> Any:
+    """
+    Colorbar whose length matches `ax` exactly (no wider than the parent map).
+
+    When `use_position=True` (default), places a figure-level axes at `ax.get_position()`
+    so the bar width equals the map axes width in figure coordinates. Call after the map
+    layout is finalized (`fig.canvas.draw()` once, or after `subplots_adjust`). This avoids
+    constrained-layout allocating oversized horizontal colorbar slots that push panels apart.
+
+    Prefer this for multi-panel boards with horizontal colorbars under tall map axes; leave
+    `fig.colorbar(ax=...)` for simple single-panel cases.
+    """
+    if use_position:
+        # Prefer a prior fig.canvas.draw() by the caller; draw once here if needed.
+        if getattr(getattr(fig, "canvas", None), "renderer", None) is None:
+            fig.canvas.draw()
+        pos = ax.get_position()
+        if orientation == "horizontal":
+            cax = fig.add_axes([pos.x0, max(pos.y0 - pad - thickness, 0.001), pos.width, thickness])
+        else:
+            cax = fig.add_axes([min(pos.x1 + pad, 0.99 - thickness), pos.y0, thickness, pos.height])
+    elif orientation == "horizontal":
+        cax = ax.inset_axes((0.0, -pad - thickness, 1.0, thickness))
+    else:
+        cax = ax.inset_axes((1.0 + pad, 0.0, thickness, 1.0))
+    cb = fig.colorbar(mappable, cax=cax, orientation=orientation)
+    if label:
+        cb.set_label(label, fontsize=label_fontsize)
+    cb.ax.tick_params(labelsize=tick_fontsize)
+    return cb
+
+
 def use_plain_axes(
     ax: Any,
     unit: str | None = None,

@@ -443,25 +443,22 @@ def regenerate_case1a() -> Path:
         N=256,
     )
 
-    fig, axes = plt.subplots(1, 4, figsize=(13.5, 12.8), sharey=True, layout="constrained")
-    fig.set_constrained_layout_pads(w_pad=0.02, h_pad=0.06, hspace=0.06, wspace=0.04)
+    fig, axes = plt.subplots(1, 4, figsize=(10.8, 12.2), sharey=True)
+    fig.subplots_adjust(left=0.055, right=0.995, top=0.945, bottom=0.10, wspace=0.07)
     fig.suptitle(
         "Case 1A — 2025 Mw 7.7 Myanmar (Sagaing): REAL Sentinel-1 (COMET LiCSAR, us7000pn9s)",
         fontsize=10,
         fontweight="bold",
         color="#0f172a",
+        y=0.98,
     )
-    try:
-        fig.get_layout_engine().set(rect=(0, 0.02, 1, 0.97))
-    except Exception:
-        pass
     panels = [
         (u_north_real, bwr_sar, -5, 5, "N-S displacement (meters)", "a  N–S displacement"),
         (azi_106D, bwr_sar, -5, 5, "Azi offset (meters)", "b  Azimuth offset (106D)"),
         (rng_106D, bwr_sar, -1, 1, "Range offset (meters)", "c  Range offset (106D)"),
         (phase_cm, sar_rainbow, 0, CM_PER_CYCLE, "LOS phase (range increase, cm)", "d  Wrapped phase (106D)"),
     ]
-    geo_aspect = 1.0 / np.cos(np.deg2rad(0.5 * (mm_lat_min + mm_lat_max)))
+    panel_mappables = []
     for ax, (arr, cmap, vmin, vmax, clabel, title) in zip(axes, panels):
         ax.imshow(hs_mm, cmap="gray", extent=extent_mm, origin="upper", vmin=0.0, vmax=1.0, aspect="auto")
         im = ax.imshow(
@@ -500,12 +497,20 @@ def regenerate_case1a() -> Path:
             )
         ax.set_xlim(mm_lon_min, mm_lon_max)
         ax.set_ylim(mm_lat_min, mm_lat_max)
-        ax.set_aspect(geo_aspect)
         ax.set_xticks([96.0])
         ax.set_xticklabels(["96°E"])
         ax.set_yticks(np.arange(19, 24))
-        ax.set_yticklabels([f"{v}°N" for v in range(19, 24)])
-        fig.colorbar(im, ax=ax, orientation="horizontal", fraction=0.035, pad=0.02).set_label(clabel, fontsize=8.5)
+        if ax is not axes[0]:
+            ax.tick_params(labelleft=False)
+        else:
+            ax.set_yticklabels([f"{v}°N" for v in range(19, 24)])
+        panel_mappables.append((im, ax, clabel))
+    fig.canvas.draw()
+    for im, ax, clabel in panel_mappables:
+        plotting.matching_width_colorbar(
+            fig, im, ax, orientation="horizontal", thickness=0.013, pad=0.026,
+            label=clabel, label_fontsize=8.0, use_position=True,
+        )
     draw_vectors(axes[0], X_mm, Y_mm, E_mm, N_mm, scale=28.0, ref=2.0, min_mag=0.3, width=0.008)
     # north arrow / scale on panel a
     axes[0].annotate(
@@ -519,7 +524,7 @@ def regenerate_case1a() -> Path:
     axes[0].text(mm_lon_min + 0.25 + 25 / 111.0, mm_lat_min + 0.32, "50 km", ha="center", fontsize=8)
     fig.text(
         0.5,
-        0.005,
+        0.012,
         "a: N–S + vectors (11 km) · b–c: 106D offsets · d: 106D ifg 2025-03-24→04-05 · α=0.60 GLO-30\n"
         "Contains modified Copernicus Sentinel-1 data (2025) processed by COMET LiCSAR (JASMIN). "
         "Copernicus DEM GLO-30. Blank = no coverage / masked by LiCSAR.",
@@ -529,7 +534,7 @@ def regenerate_case1a() -> Path:
         color="#334155",
     )
     out = IMG / "case1a_myanmar_earthquake.jpg"
-    plotting.save_figure(fig, out, max_width_px=1400, quality=82)
+    plotting.save_figure(fig, out, max_width_px=1500, quality=75)
     return out
 
 
