@@ -191,7 +191,19 @@ def regenerate_cwt_multiscale() -> Path:
     ax_prof.grid(True, ls=":", alpha=0.45)
     lines1, labels1 = ax_prof.get_legend_handles_labels()
     lines2, labels2 = ax_prof2.get_legend_handles_labels()
-    ax_prof2.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7.5)
+    # Larger in-axes legend so Elevation / CWT entries stay readable at README size.
+    ax_prof.legend(
+        lines1 + lines2,
+        labels1 + labels2,
+        loc="upper right",
+        fontsize=15,
+        handlelength=3.4,
+        handletextpad=0.75,
+        borderpad=0.7,
+        labelspacing=0.6,
+        markerscale=1.2,
+        framealpha=0.94,
+    )
 
     # (e) Dominant wavelength on DEM hillshade (old d → old f slot as transparent overlay)
     lam = np.asarray(sheep_cwt["dominant_wavelength_m"].data, dtype=np.float64)
@@ -209,6 +221,7 @@ def regenerate_cwt_multiscale() -> Path:
 
     for a in (ax_a, ax_b, ax_c, ax_lam):
         plotting.use_plain_axes(a)
+        a.set_aspect("equal", adjustable="box")
 
     fig.suptitle(
         "pyGeoMapper — Rust 2D Mexican-hat CWT and multiscale topographic complexity (Sheep Mountain)",
@@ -216,6 +229,17 @@ def regenerate_cwt_multiscale() -> Path:
         fontweight="bold",
         y=1.01,
     )
+
+    # Equal-aspect maps shrink inside the bottom-right cell; unconstrained (d) would otherwise
+    # fill the full row height. Freeze layout, then lock (d)/(d twin) to (e)'s axes height.
+    fig.canvas.draw()
+    fig.set_layout_engine(None)
+    pos_e = ax_lam.get_position()
+    pos_d = ax_prof.get_position()
+    matched = [pos_d.x0, pos_e.y0, pos_d.width, pos_e.height]
+    ax_prof.set_position(matched)
+    ax_prof2.set_position(matched)
+
     out = IMG / "cwt_multiscale.png"
     plotting.save_figure(fig, out, max_width_px=1400, palette=True)
     return out
