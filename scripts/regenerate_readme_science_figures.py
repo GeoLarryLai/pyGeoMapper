@@ -96,9 +96,10 @@ def regenerate_cwt_multiscale() -> Path:
         sheep_dem, scales_m=[30.0, 60.0, 120.0, 220.0]
     )
 
-    fig = plt.figure(figsize=(16.0, 10.2), layout="constrained")
-    fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.05, hspace=0.08, wspace=0.05)
-    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0])
+    # Slightly shorter canvas + tighter vertical pads so rows sit closer after equal-aspect shrink.
+    fig = plt.figure(figsize=(16.0, 9.2), layout="constrained")
+    fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.02, hspace=0.02, wspace=0.05)
+    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 0.92])
     ax_a = fig.add_subplot(gs[0, 0])
     ax_b = fig.add_subplot(gs[0, 1])
     ax_c = fig.add_subplot(gs[0, 2])
@@ -230,15 +231,35 @@ def regenerate_cwt_multiscale() -> Path:
         y=1.01,
     )
 
-    # Equal-aspect maps shrink inside the bottom-right cell; unconstrained (d) would otherwise
-    # fill the full row height. Freeze layout, then lock (d)/(d twin) to (e)'s axes height.
+    # Equal-aspect maps shrink inside their cells; unconstrained (d) would otherwise fill the
+    # full bottom-row height. Freeze layout, lock (d) height to (e), then lift the bottom row
+    # so unused cell padding does not read as a large between-row gap.
     fig.canvas.draw()
     fig.set_layout_engine(None)
+    pos_top = ax_a.get_position()
     pos_e = ax_lam.get_position()
     pos_d = ax_prof.get_position()
     matched = [pos_d.x0, pos_e.y0, pos_d.width, pos_e.height]
     ax_prof.set_position(matched)
     ax_prof2.set_position(matched)
+
+    # Vertical gap between bottom of top-row axes and top of bottom-row axes (figure coords).
+    gap = float(pos_top.y0 - (pos_e.y0 + pos_e.height))
+    if gap > 0.012:
+        # Leave a small visual margin (~0.010 fig fraction); shift the rest upward.
+        dy = gap - 0.010
+        for ax in (ax_prof, ax_prof2, ax_lam):
+            p = ax.get_position()
+            ax.set_position([p.x0, p.y0 + dy, p.width, p.height])
+        # Keep (e)'s colorbar glued to the lifted map axes.
+        pos_e2 = ax_lam.get_position()
+        for cax in fig.axes:
+            if cax in (ax_a, ax_b, ax_c, ax_prof, ax_prof2, ax_lam):
+                continue
+            cp = cax.get_position()
+            # Colorbar sitting to the right of panel (e).
+            if cp.x0 >= pos_e2.x0 + 0.5 * pos_e2.width and abs(cp.y0 - pos_e.y0) < 0.08:
+                cax.set_position([cp.x0, pos_e2.y0, cp.width, pos_e2.height])
 
     out = IMG / "cwt_multiscale.png"
     plotting.save_figure(fig, out, max_width_px=1400, palette=True)
