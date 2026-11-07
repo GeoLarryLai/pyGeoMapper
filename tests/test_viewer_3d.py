@@ -235,12 +235,25 @@ def test_3d_renderers_and_forge3d_adapter():
     assert red, "fault trace not drawn"
     plt.close(fig4)
 
+    b0, b1 = (728390.0, 4941805.0), (728250.0, 4944795.0)
     fig5, axes5 = viewer_3d.plot_3d_block_and_section(
-        block_f, start_xy, end_xy, n_samples=80, top_stride=4, wall_stride=2
+        block_f,
+        start_xy,
+        end_xy,
+        sections=[(start_xy, end_xy, "A", "A'"), (b0, b1, "B", "B'")],
+        n_samples=80,
+        top_stride=2,
+        wall_stride=2,
+        azimuth_deg=-88.0,
+        elevation_deg=26.0,
     )
     assert len(fig5.axes) >= 2
-    # Left solid block should carry the A–A′ surface mark (black polyline + labels).
+    # Left opaque block should carry section marks (black) and a red fault trace with ticks.
     assert any(ln.get_color() in ("#111111", "k", "black") for ln in axes5[0].get_lines())
+    assert any(ln.get_color() == "#d62728" for ln in axes5[0].get_lines())
+    # Both panels share the same camera.
+    assert axes5[0].azim == axes5[1].azim
+    assert axes5[0].elev == axes5[1].elev
     plt.close(fig5)
 
 

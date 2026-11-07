@@ -174,8 +174,20 @@ def regenerate_cwt_multiscale() -> Path:
     return out
 
 
+# A–A' (SW–NE across the anticline) and B–B' (~60° different, nearly N–S across the fold).
+SHEEP_AA = ((726900.0, 4942800.0), (729700.0, 4944600.0))
+SHEEP_BB = ((728390.0, 4941805.0), (728250.0, 4944795.0))
+SHEEP_SECTIONS = (
+    (SHEEP_AA[0], SHEEP_AA[1], "A", "A'"),
+    (SHEEP_BB[0], SHEEP_BB[1], "B", "B'"),
+)
+# Shared 3D camera: ~30° clockwise from a SE face-on view so more of the S–N block side is visible.
+SHEEP_3D_AZIMUTH_DEG = -88.0
+SHEEP_3D_ELEVATION_DEG = 26.0
+
+
 def _sheep_fault(dem):
-    start_xy, end_xy = (726900.0, 4942800.0), (729700.0, 4944600.0)
+    start_xy, end_xy = SHEEP_AA
     tip = cross_section.locate_fault_tip_along_section(dem, start_xy, end_xy)
     throw_m = float(np.clip(0.5 * tip["section_relief_m"], 80.0, 200.0))
     fault = cross_section.reconstruct_planar_fault(
@@ -211,27 +223,30 @@ def regenerate_cross_section() -> Path:
     attitudes = cross_section.estimate_contact_attitudes(
         geol, dem, window_m=400.0, min_points=5, min_relief_m=5.0, min_r2=0.45
     )
-    start_xy, end_xy, fault_3d = _sheep_fault(dem)
-    fault_2d = cross_section.section_fault_params(fault_3d, start_xy, end_xy)
+    _, _, fault_3d = _sheep_fault(dem)
     print("cross-section fault published:", fault_3d["published"])
     print("cross-section fault inferred:", fault_3d["inferred"])
-    print("section params:", fault_2d)
 
-    # README shows the faulted A–A′ only (faults=None remains available as a user toggle).
-    sec_f = cross_section.build_geological_cross_section(
-        dem, geol, start_xy=start_xy, end_xy=end_xy, attitudes=attitudes, depth_m=360.0, faults=[fault_2d]
-    )
-    fig, ax = plt.subplots(figsize=(13, 5.2), layout="constrained")
-    cross_section.plot_geological_cross_section(
-        sec_f,
-        unit_metadata=unit_metadata,
-        vertical_exaggeration=1.6,
-        ax=ax,
-        title=(
-            "Sheep Mountain Anticline A–A′ with published SW-dipping ~50° basement thrust "
-            f"(apparent {fault_2d['dip_deg']:.0f}°, throw = +{fault_2d['throw_m']:.0f} m inferred)"
-        ),
-    )
+    # Stack the same two faulted sections used in the 3D README figure (A–A' above, B–B' below).
+    fig, axes = plt.subplots(2, 1, figsize=(13, 9.4), layout="constrained")
+    for ax, (p0, p1, lab0, lab1) in zip(axes, SHEEP_SECTIONS):
+        fault_2d = cross_section.section_fault_params(fault_3d, p0, p1)
+        print(f"section {lab0}–{lab1} params:", fault_2d)
+        sec = cross_section.build_geological_cross_section(
+            dem, geol, start_xy=p0, end_xy=p1, attitudes=attitudes, depth_m=360.0, faults=[fault_2d]
+        )
+        cross_section.plot_geological_cross_section(
+            sec,
+            unit_metadata=unit_metadata,
+            vertical_exaggeration=1.6,
+            ax=ax,
+            dip_tick_color="#1f6feb",
+            section_labels=(lab0, lab1),
+            title=(
+                f"Sheep Mountain Anticline {lab0}–{lab1} with published SW-dipping ~50° basement thrust "
+                f"(apparent {fault_2d['dip_deg']:.0f}°, throw = +{fault_2d['throw_m']:.0f} m inferred)"
+            ),
+        )
     out = IMG / "cross_section.png"
     plotting.save_figure(fig, out, max_width_px=1600)
     plt.close(fig)
@@ -257,38 +272,41 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         cutaway_fraction=(0.48, 0.48, 0.36),
     )
 
-    # Solid volumetric block (A–A′ marked) | matching faulted section from a different camera.
+    # Opaque solid block (A–A' + B–B' marked) | matching faulted fences; shared camera.
     fig, _ = viewer_3d.plot_3d_block_and_section(
         block_f,
         start_xy,
         end_xy,
+        sections=SHEEP_SECTIONS,
         vertical_exaggeration=1.7,
-        block_azimuth_deg=-58.0,
-        block_elevation_deg=28.0,
-        section_elevation_deg=22.0,
+        azimuth_deg=SHEEP_3D_AZIMUTH_DEG,
+        elevation_deg=SHEEP_3D_ELEVATION_DEG,
         n_samples=160,
         show_fault_plane=True,
+        top_stride=1,
+        wall_stride=1,
         titles=(
-            "(a) 3D geologic block with A–A′ section location",
-            f"(b) Matching 3D section A–A′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
+            "(a) 3D geologic block with A–A′ & B–B′ section locations",
+            f"(b) Matching 3D sections A–A′ & B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
             f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
         ),
     )
     out1 = IMG / "3d_block_diagram.png"
-    plotting.save_figure(fig, out1, max_width_px=1400, palette=True)
+    plotting.save_figure(fig, out1, max_width_px=1350, palette=False)
     plt.close(fig)
 
-    fence_panels = viewer_3d.slice_3d_fence_diagram(block_f, transects=[(start_xy, end_xy)], n_samples=160)
-    fence_panels[0]["name"] = "Fence A-A'"
-    section_az = float(np.rad2deg(np.arctan2(end_xy[0] - start_xy[0], end_xy[1] - start_xy[1])) % 360.0)
-    view_az = float((section_az + 180.0) % 360.0 - 180.0)
+    fence_panels = viewer_3d.slice_3d_fence_diagram(
+        block_f, transects=[(s[0], s[1]) for s in SHEEP_SECTIONS], n_samples=160
+    )
+    for fence, sec in zip(fence_panels, SHEEP_SECTIONS):
+        fence["name"] = f"Fence {sec[2]}-{sec[3]}"
     fig = plt.figure(figsize=(16, 7.2), layout="constrained")
     ax1 = fig.add_subplot(121, projection="3d")
     viewer_3d.plot_3d_cutaway_block(
         block_f,
         vertical_exaggeration=1.7,
-        azimuth_deg=-52.0,
-        elevation_deg=30.0,
+        azimuth_deg=SHEEP_3D_AZIMUTH_DEG,
+        elevation_deg=SHEEP_3D_ELEVATION_DEG,
         face_stride=1,
         show_fault_plane=True,
         show_legend=True,
@@ -300,13 +318,13 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         block_f,
         fence_panels=fence_panels,
         vertical_exaggeration=1.7,
-        azimuth_deg=view_az,
-        elevation_deg=22.0,
+        azimuth_deg=SHEEP_3D_AZIMUTH_DEG,
+        elevation_deg=SHEEP_3D_ELEVATION_DEG,
         show_fault_plane=True,
         show_wireframe_surface=True,
         show_legend=False,
         ax=ax2,
-        title="(b) Single 3D A–A′ fence + reconstructed fault plane",
+        title="(b) 3D A–A′ & B–B′ fences + reconstructed fault plane",
     )
     out2 = IMG / "3d_cutaway_and_fence.png"
     plotting.save_figure(fig, out2, max_width_px=1500)

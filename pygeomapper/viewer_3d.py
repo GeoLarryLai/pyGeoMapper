@@ -22,9 +22,9 @@ perspective DEM draping (`plot_3d_terrain_drape`), plus:
   (https://pypi.org/project/forge3d/) when available, with automatic fallback.
 - `plot_3d_block_diagram`, `plot_3d_cutaway_block`, `plot_3d_fence_diagram`,
   `plot_3d_block_and_section`: Publication-ready 3D block / cutaway / fence renderers, plus a
-  README-style pair (solid volumetric block with A–A′ marked | matching faulted section view).
-  `include_fault` / `show_fault_plane` toggle loading and drawing of a plane from
-  `reconstruct_planar_fault`.
+  README-style pair (opaque volumetric block with A–A′ / B–B′ marked | matching faulted
+  section fences, shared camera). `include_fault` / `show_fault_plane` toggle loading and
+  drawing of a plane from `reconstruct_planar_fault`.
 - `export_interactive_block_html` & `launch_block_viewer`: Self-contained, 100% offline
   interactive 3D HTML5/WebGL canvas block-diagram viewer for Jupyter notebooks and browsers.
 """
@@ -749,6 +749,8 @@ def _render_mesh_poly3d(
     face_stride: int = 1,
     alpha: float = 1.0,
     edge_alpha: float = 0.0,
+    force_rgba: tuple[float, float, float, float] | None = None,
+    edge_rgba: tuple[float, float, float, float] | None = None,
 ) -> None:
     """Render a subset of triangles from a Rust `Mesh3DData` dictionary onto a Matplotlib 3D Axes."""
     verts = np.asarray(mesh["vertices"], dtype=np.float64)
@@ -774,21 +776,38 @@ def _render_mesh_poly3d(
     v_rel[:, 1] -= y_origin
 
     polys = v_rel[tris]
-    # Per-triangle color = mean of its 3 vertex RGBA colors
-    c0 = cols_u8[tris[:, 0]].astype(np.float64)
-    c1 = cols_u8[tris[:, 1]].astype(np.float64)
-    c2 = cols_u8[tris[:, 2]].astype(np.float64)
-    tri_rgba = (c0 + c1 + c2) / (3.0 * 255.0)
-    tri_rgba[:, 3] = np.clip(tri_rgba[:, 3] * float(alpha), 0.05, 1.0)
+    if force_rgba is not None:
+        tri_rgba = np.tile(np.asarray(force_rgba, dtype=np.float64), (len(tris), 1))
+        tri_rgba[:, 3] = np.clip(tri_rgba[:, 3] * float(alpha), 0.05, 1.0)
+    else:
+        # Per-triangle color = mean of its 3 vertex RGBA colors
+        c0 = cols_u8[tris[:, 0]].astype(np.float64)
+        c1 = cols_u8[tris[:, 1]].astype(np.float64)
+        c2 = cols_u8[tris[:, 2]].astype(np.float64)
+        tri_rgba = (c0 + c1 + c2) / (3.0 * 255.0)
+        tri_rgba[:, 3] = np.clip(tri_rgba[:, 3] * float(alpha), 0.05, 1.0)
 
-    edgecolors = (0.15, 0.15, 0.15, float(edge_alpha)) if edge_alpha > 0 else "none"
+    if edge_rgba is not None:
+        edgecolors = edge_rgba
+        lw = 0.35
+    elif edge_alpha > 0:
+        edgecolors = (0.15, 0.15, 0.15, float(edge_alpha))
+        lw = 0.15
+    else:
+        edgecolors = "none"
+        lw = 0.0
     coll = Poly3DCollection(
         polys,
         facecolors=tri_rgba,
         edgecolors=edgecolors,
-        linewidths=0.15 if edge_alpha > 0 else 0.0,
-        antialiased=True,
+        linewidths=lw,
+        antialiased=False,
     )
+    # Prefer painter's algorithm that keeps later (top) faces covering earlier walls.
+    try:
+        coll.set_zsort("min")
+    except Exception:
+        pass
     ax.add_collection3d(coll)
 
 
@@ -834,6 +853,69 @@ def _plot_3d_attitude_discs(
         )
 
 
+def _plot_3d_surface_contacts(
+    ax: Any,
+    block_model: dict[str, Any],
+    x_origin: float,
+    y_origin: float,
+    *,
+    color: str = "#111111",
+    linewidth: float = 1.2,
+) -> None:
+    """Draw non-fault unit contacts on the top surface as solid black lines (no tick marks)."""
+    import contourpy
+
+    dem: GeoGrid = block_model["dem"]
+    geol = block_model.get("geol_labels")
+    if geol is None:
+        return
+    labels = np.asarray(geol.data if hasattr(geol, "data") else geol, dtype=np.float64)
+    lbl = np.where(np.isfinite(labels) & (labels >= 0), np.round(labels), np.nan)
+    if not np.isfinite(lbl).any():
+        return
+    xs = dem.x_coords()
+    ys = dem.y_coords()
+    z_dem = np.asarray(dem.data, dtype=np.float64)
+    order = np.argsort(ys)
+    ys_inc = ys[order]
+    lbl_inc = lbl[order]
+    z_inc = z_dem[order]
+    # Contour half-integer boundaries between integer unit IDs → solid contact polylines.
+    levels = np.arange(np.nanmin(lbl_inc) + 0.5, np.nanmax(lbl_inc), 1.0)
+    if levels.size == 0:
+        return
+    gen = contourpy.contour_generator(x=xs, y=ys_inc, z=np.nan_to_num(lbl_inc, nan=-1.0))
+    for lev in levels:
+        for line in gen.lines(float(lev)):
+            if len(line) < 2:
+                continue
+            ci = np.interp(line[:, 0], xs, np.arange(len(xs)))
+            ri = np.interp(line[:, 1], ys_inc, np.arange(len(ys_inc)))
+            z_line = z_inc[np.clip(np.round(ri).astype(int), 0, len(ys_inc) - 1),
+                           np.clip(np.round(ci).astype(int), 0, len(xs) - 1)] + 5.0
+            ax.plot(
+                line[:, 0] - x_origin,
+                line[:, 1] - y_origin,
+                z_line,
+                color=color,
+                linewidth=linewidth,
+                solid_capstyle="round",
+                zorder=16,
+            )
+
+
+def _fault_dip_tick_dirs(fault_spec: dict[str, Any]) -> tuple[float, float, float]:
+    """Unit dip-direction vector (east, north, down-positive-z uses negative vertical component)."""
+    dip_dir = float(fault_spec.get("dip_dir_deg", (float(fault_spec["strike_deg"]) + 90.0) % 360.0))
+    dip = float(fault_spec.get("dip_deg", 50.0))
+    rad_az = np.deg2rad(dip_dir)
+    rad_dip = np.deg2rad(dip)
+    dx = float(np.sin(rad_az) * np.cos(rad_dip))
+    dy = float(np.cos(rad_az) * np.cos(rad_dip))
+    dz = float(-np.sin(rad_dip))
+    return dx, dy, dz
+
+
 def _plot_3d_fault_traces(
     ax: Any,
     block_model: dict[str, Any],
@@ -842,22 +924,41 @@ def _plot_3d_fault_traces(
     azimuth_deg: float,
     color: str = "#d62728",
     linewidth: float = 2.6,
+    show_dip_ticks: bool = True,
 ) -> None:
     """
-    Draw where the fault plane cuts the block: its trace on the top topographic surface and on the side
-    walls that face the viewer. The plane itself lies inside the opaque block, so it is not drawn.
+    Draw where the fault plane cuts the block: red trace on the top surface and facing side walls,
+    with short ticks indicating fault-plane dip direction. The plane itself is inside the opaque
+    block, so it is not filled on the solid-block view.
     """
     import contourpy
 
     dem: GeoGrid = block_model["dem"]
     z_flt = np.asarray(block_model.get("fault_surface_z"), dtype=np.float64)
-    if block_model.get("fault_spec") is None or z_flt.shape != dem.shape or not np.isfinite(z_flt).any():
+    fault_spec = block_model.get("fault_spec")
+    if fault_spec is None or z_flt.shape != dem.shape or not np.isfinite(z_flt).any():
         return
     xs, ys = dem.x_coords(), dem.y_coords()
     z_dem = np.asarray(dem.data, dtype=np.float64)
     z_bot = float(block_model["z_bottom"])
     order = np.argsort(ys)
     ys_inc, zd, zf = ys[order], z_dem[order], z_flt[order]
+    tick_dx, tick_dy, tick_dz = _fault_dip_tick_dirs(fault_spec)
+    tick_len = 120.0
+
+    def _add_dip_ticks(x_line: np.ndarray, y_line: np.ndarray, z_line: np.ndarray) -> None:
+        if not show_dip_ticks or len(x_line) < 2:
+            return
+        idx = np.linspace(0, len(x_line) - 1, num=min(11, max(len(x_line) // 8, 4)), dtype=int)
+        for i in idx:
+            ax.plot(
+                [x_line[i], x_line[i] + tick_dx * tick_len],
+                [y_line[i], y_line[i] + tick_dy * tick_len],
+                [z_line[i], z_line[i] + tick_dz * tick_len * 0.85],
+                color=color,
+                linewidth=1.8,
+                zorder=19,
+            )
 
     # Top-surface trace: zero contour of (z_dem - z_fault), lifted slightly so it is not hidden by the drape
     gen = contourpy.contour_generator(x=xs, y=ys_inc, z=np.nan_to_num(zd - zf, nan=0.0))
@@ -867,7 +968,10 @@ def _plot_3d_fault_traces(
         ci = np.interp(line[:, 0], xs, np.arange(len(xs)))
         ri = np.interp(line[:, 1], ys_inc, np.arange(len(ys_inc)))
         z_line = zd[np.round(ri).astype(int), np.round(ci).astype(int)] + 6.0
-        ax.plot(line[:, 0] - x_origin, line[:, 1] - y_origin, z_line, color=color, linewidth=linewidth, zorder=18)
+        xl = line[:, 0] - x_origin
+        yl = line[:, 1] - y_origin
+        ax.plot(xl, yl, z_line, color=color, linewidth=linewidth, zorder=18)
+        _add_dip_ticks(xl, yl, z_line)
 
     # Side-wall traces on the walls facing the camera (outward normal toward the eye)
     az = np.deg2rad(float(azimuth_deg))
@@ -882,7 +986,12 @@ def _plot_3d_fault_traces(
         if normal[0] * eye[0] + normal[1] * eye[1] <= 0.0:
             continue
         z_line = np.where((z_wall >= z_bot) & (z_wall <= top), z_wall, np.nan)
-        ax.plot(wx - x_origin, wy - y_origin, z_line, color=color, linewidth=linewidth, zorder=18)
+        xl = wx - x_origin
+        yl = wy - y_origin
+        ax.plot(xl, yl, z_line, color=color, linewidth=linewidth, zorder=18)
+        finite = np.isfinite(z_line)
+        if np.count_nonzero(finite) >= 2:
+            _add_dip_ticks(xl[finite], yl[finite], z_line[finite])
 
 
 def _add_unit_legend(ax: Any, units_metadata: Sequence[dict[str, Any]], include_fault: bool = True) -> None:
@@ -1001,19 +1110,26 @@ def plot_3d_block_diagram(
     wall_stride: int = 1,
     show_attitudes: bool = True,
     show_fault_plane: bool = False,
+    show_surface_contacts: bool = True,
     show_legend: bool = True,
     ax: Any | None = None,
     title: str | None = "3D Geological Block Diagram (Surface & Projected Subsurface)",
-    section_xy: tuple[tuple[float, float], tuple[float, float]] | None = None,
+    section_xy: (
+        tuple[tuple[float, float], tuple[float, float]]
+        | Sequence[tuple[tuple[float, float], tuple[float, float], str, str]]
+        | None
+    ) = None,
 ) -> tuple[Any, Any]:
     """
     Render a publication-quality 3D perspective geological block diagram showing:
-    - Top topographic surface draped with geological units (or custom RGB/RGBA drape)
+    - Top topographic surface draped with geological units (or custom RGB/RGBA drape) — opaque
     - Four vertical cross-section side walls (South, North, West, East) down to `z_bottom`
     - Base plate and 3-point strike/dip orientation pins.
-    - `show_fault_plane=True`: red fault trace where the fault plane cuts the top surface and the side walls
-      facing the viewer (the plane itself is inside the opaque block); the legend lists the fault only then.
-    - `section_xy=(start_xy, end_xy)`: optional A–A′ surface trace marked on the solid block top.
+    - Non-fault unit contacts as solid black surface lines (no ticks).
+    - `show_fault_plane=True`: red fault trace with dip-direction ticks on top/side walls
+      (the plane itself is inside the opaque block); the legend lists the fault only then.
+    - `section_xy`: one `(start, end)` pair or a sequence of `(start, end, label0, label1)`
+      surface traces marked on the solid block top (e.g. A–A' and B–B').
     """
     dem: GeoGrid = block_model["dem"]
     xs = dem.x_coords()
@@ -1030,6 +1146,7 @@ def plot_3d_block_diagram(
         fig = ax.figure
 
     # 1. Render base plate (`face_group=5`) and 4 outer vertical cross-section walls (`face_group=1..4`)
+    # Opaque solid faces (no edge mesh) so the block does not look see-through.
     _render_mesh_poly3d(
         ax,
         block_model["mesh"],
@@ -1038,44 +1155,36 @@ def plot_3d_block_diagram(
         include_face_groups=[1, 2, 3, 4, 5],
         face_stride=wall_stride,
         alpha=1.0,
-        edge_alpha=0.05,
+        edge_alpha=0.0,
     )
 
-    # 2. Render top topographic surface (`face_group=0`) via Poly3DCollection so depth sorting matches side walls
+    # 2. Opaque top topographic surface via plot_surface (avoids MPL Poly3DCollection see-through).
     xx, yy = np.meshgrid(xs - x_min, ys - y_min)
     zz = np.nan_to_num(dem.data, nan=float(np.nanmean(dem.data)))
     if surface_drape_rgba is not None:
-        custom_mesh = dict(block_model["mesh"])
         drape_u8 = np.ascontiguousarray(surface_drape_rgba, dtype=np.uint8)
-        if drape_u8.shape[2] == 3:
-            drape_u8 = np.dstack([drape_u8, np.full(dem.shape, 255, dtype=np.uint8)])
-        vc = np.array(custom_mesh["vertex_colors_rgba"], dtype=np.uint8, copy=True)
-        fg = np.asarray(custom_mesh["face_groups"], dtype=np.uint8)
-        top_mask = fg == 0
-        if np.sum(top_mask) == dem.rows * dem.cols:
-            vc[top_mask] = drape_u8.reshape(-1, 4)
-        custom_mesh["vertex_colors_rgba"] = vc
-        _render_mesh_poly3d(
-            ax,
-            custom_mesh,
-            x_origin=x_min,
-            y_origin=y_min,
-            include_face_groups=[0],
-            face_stride=max(1, int(top_stride)),
-            alpha=1.0,
-            edge_alpha=0.0,
-        )
     else:
-        _render_mesh_poly3d(
-            ax,
-            block_model["mesh"],
-            x_origin=x_min,
-            y_origin=y_min,
-            include_face_groups=[0],
-            face_stride=max(1, int(top_stride)),
-            alpha=1.0,
-            edge_alpha=0.0,
-        )
+        drape_u8 = np.ascontiguousarray(block_model["surface_drape_rgba"], dtype=np.uint8)
+    if drape_u8.shape[2] == 3:
+        drape_u8 = np.dstack([drape_u8, np.full(dem.shape, 255, dtype=np.uint8)])
+    stride = max(1, int(top_stride))
+    facecolors = drape_u8[::stride, ::stride, :3].astype(np.float64) / 255.0
+    # plot_surface wants (M-1, N-1, 4) facecolors for an (M, N) grid
+    fc = np.concatenate(
+        [facecolors[:-1, :-1, :], np.ones((*facecolors[:-1, :-1].shape[:2], 1), dtype=np.float64)],
+        axis=-1,
+    )
+    ax.plot_surface(
+        xx[::stride, ::stride],
+        yy[::stride, ::stride],
+        zz[::stride, ::stride],
+        facecolors=fc,
+        shade=False,
+        linewidth=0,
+        antialiased=False,
+        rstride=1,
+        cstride=1,
+    )
 
     # Draw crisp black bounding rim around top topography and base corners
     ax.plot(xx[-1, :], yy[-1, :], zz[-1, :], color="#1a1a1a", linewidth=1.1, zorder=15)
@@ -1083,11 +1192,34 @@ def plot_3d_block_diagram(
     ax.plot(xx[:, 0], yy[:, 0], zz[:, 0], color="#1a1a1a", linewidth=1.1, zorder=15)
     ax.plot(xx[:, -1], yy[:, -1], zz[:, -1], color="#1a1a1a", linewidth=0.9, zorder=15)
 
+    if show_surface_contacts:
+        _plot_3d_surface_contacts(ax, block_model, x_origin=x_min, y_origin=y_min)
+
     if show_fault_plane:
         _plot_3d_fault_traces(ax, block_model, x_origin=x_min, y_origin=y_min, azimuth_deg=azimuth_deg)
 
     if show_attitudes and block_model.get("attitudes"):
         _plot_3d_attitude_discs(ax, block_model["attitudes"], x_origin=x_min, y_origin=y_min)
+
+    if section_xy is not None:
+        # Accept a single (start, end) or a list of (start, end, lab0, lab1)
+        if (
+            isinstance(section_xy, (list, tuple))
+            and len(section_xy) >= 2
+            and isinstance(section_xy[0], (list, tuple))
+            and len(section_xy[0]) >= 2
+            and isinstance(section_xy[0][0], (int, float))
+        ):
+            # Single transect (start_xy, end_xy)
+            mark_section_on_block(ax, block_model, section_xy[0], section_xy[1])  # type: ignore[arg-type]
+        else:
+            for item in section_xy:  # type: ignore[union-attr]
+                s0, s1 = item[0], item[1]
+                lab0 = item[2] if len(item) > 2 else "A"
+                lab1 = item[3] if len(item) > 3 else "A'"
+                mark_section_on_block(
+                    ax, block_model, s0, s1, label_a=str(lab0), label_ap=str(lab1)
+                )
 
     x_range = x_max - x_min
     y_range = y_max - y_min
@@ -1103,8 +1235,6 @@ def plot_3d_block_diagram(
     ax.set_zlabel("Elevation (m NAVD88)", labelpad=6)
     if title:
         ax.set_title(title, fontweight="bold", pad=10)
-    if section_xy is not None:
-        mark_section_on_block(ax, block_model, section_xy[0], section_xy[1])
 
     if show_legend:
         _add_unit_legend(
@@ -1286,15 +1416,18 @@ def plot_3d_fence_diagram(
         )
 
     if show_fault_plane:
+        # Transparent red fault surface following the reconstructed plane underground.
         _render_mesh_poly3d(
             ax,
             block_model["mesh"],
             x_origin=x_min,
             y_origin=y_min,
             include_face_groups=[7],
-            face_stride=3,
-            alpha=0.52,
-            edge_alpha=0.18,
+            face_stride=2,
+            alpha=1.0,
+            edge_alpha=0.0,
+            force_rgba=(0.839, 0.153, 0.157, 0.48),
+            edge_rgba=(0.70, 0.05, 0.05, 0.40),
         )
 
     if show_wireframe_surface:
@@ -1339,42 +1472,52 @@ def plot_3d_block_and_section(
     start_xy: tuple[float, float],
     end_xy: tuple[float, float],
     *,
+    sections: Sequence[tuple[tuple[float, float], tuple[float, float], str, str]] | None = None,
     vertical_exaggeration: float = 1.65,
-    block_azimuth_deg: float = -58.0,
-    block_elevation_deg: float = 28.0,
+    azimuth_deg: float = -88.0,
+    elevation_deg: float = 26.0,
+    block_azimuth_deg: float | None = None,
+    block_elevation_deg: float | None = None,
     section_azimuth_deg: float | None = None,
-    section_elevation_deg: float = 22.0,
+    section_elevation_deg: float | None = None,
     n_samples: int = 160,
     show_fault_plane: bool = True,
-    top_stride: int = 2,
+    top_stride: int = 1,
     wall_stride: int = 1,
     titles: tuple[str, str] | None = None,
 ) -> tuple[Any, tuple[Any, Any]]:
     """
-    README-style pair: solid volumetric 3D block (A–A′ marked) | matching faulted section cut.
+    README-style pair: opaque solid volumetric 3D block | matching faulted section fences.
 
-    Left uses the full opaque block mesh with the A–A′ surface trace marked. Right shows only
-    that same transect as a 3D fence with the reconstructed fault plane, from a different
-    camera so the cut face is readable (comparable to the 2D section). No unfaulted twin,
-    no extra B–B′ / C–C′ fences.
+    Left: opaque block with section-position traces marked (default A–A' only, or pass
+    `sections=` for A–A' + B–B'). Non-fault contacts are solid black; the fault is a red
+    trace with dip ticks. Right: the same transect(s) as 3D fences with a transparent red
+    fault surface dipping underground.
+
+    Both panels share one camera (`azimuth_deg` / `elevation_deg`). Default azimuth ≈ −28°
+    is ~30° clockwise from a SE face-on view so more of the south–north block side is visible.
     """
-    dem: GeoGrid = block_model["dem"]
-    xa, ya = (float(start_xy[0]), float(start_xy[1]))
-    xb, yb = (float(end_xy[0]), float(end_xy[1]))
-    section_az = float(np.rad2deg(np.arctan2(xb - xa, yb - ya)) % 360.0)
-    # View along the section line so the vertical cut face faces the camera.
-    if section_azimuth_deg is None:
-        section_azimuth_deg = float((section_az + 180.0) % 360.0 - 180.0)
+    if sections is None:
+        sections = [(start_xy, end_xy, "A", "A'")]
 
-    fences = slice_3d_fence_diagram(
-        block_model, transects=[(start_xy, end_xy)], n_samples=n_samples
-    )
-    fences[0]["name"] = "Fence A-A'"
+    # Shared camera (legacy kwargs still accepted but default to the shared view).
+    az = float(azimuth_deg if block_azimuth_deg is None else block_azimuth_deg)
+    el = float(elevation_deg if block_elevation_deg is None else block_elevation_deg)
+    if section_azimuth_deg is not None:
+        az = float(section_azimuth_deg)
+    if section_elevation_deg is not None:
+        el = float(section_elevation_deg)
+
+    transects = [(s[0], s[1]) for s in sections]
+    fences = slice_3d_fence_diagram(block_model, transects=transects, n_samples=n_samples)
+    for fence, sec in zip(fences, sections):
+        fence["name"] = f"Fence {sec[2]}-{sec[3]}"
 
     if titles is None:
+        labels = " & ".join(f"{s[2]}–{s[3]}" for s in sections)
         titles = (
-            "(a) 3D geologic block with A–A′ section location",
-            "(b) Matching 3D section A–A′ (published ~50° SW thrust; tip/throw inferred)",
+            f"(a) 3D geologic block with {labels} section locations",
+            f"(b) Matching 3D sections {labels} (published ~50° SW thrust; tip/throw inferred)",
         )
 
     fig = plt.figure(figsize=(14.5, 6.6), layout="constrained")
@@ -1383,22 +1526,24 @@ def plot_3d_block_and_section(
     plot_3d_block_diagram(
         block_model,
         vertical_exaggeration=vertical_exaggeration,
-        azimuth_deg=block_azimuth_deg,
-        elevation_deg=block_elevation_deg,
+        azimuth_deg=az,
+        elevation_deg=el,
         top_stride=top_stride,
         wall_stride=wall_stride,
-        show_fault_plane=False,
+        show_fault_plane=show_fault_plane,
+        show_surface_contacts=True,
+        show_attitudes=False,
         show_legend=False,
         ax=ax0,
         title=titles[0],
-        section_xy=(start_xy, end_xy),
+        section_xy=list(sections),
     )
     plot_3d_fence_diagram(
         block_model,
         fence_panels=fences,
         vertical_exaggeration=vertical_exaggeration,
-        azimuth_deg=section_azimuth_deg,
-        elevation_deg=section_elevation_deg,
+        azimuth_deg=az,
+        elevation_deg=el,
         show_fault_plane=show_fault_plane,
         show_wireframe_surface=True,
         show_legend=True,
@@ -1417,23 +1562,22 @@ def plot_3d_section_comparison(
     *,
     vertical_exaggeration: float = 1.65,
     azimuth_deg: float | None = None,
-    elevation_deg: float = 22.0,
+    elevation_deg: float = 28.0,
     n_samples: int = 160,
     show_fault_plane: bool = True,
     titles: tuple[str, str] | None = None,
 ) -> tuple[Any, tuple[Any, Any]]:
-    """Deprecated alias: solid faulted block + matching faulted A–A′ section (no unfaulted twin)."""
-    return plot_3d_block_and_section(
-        block_faulted,
-        start_xy,
-        end_xy,
+    """Deprecated alias: opaque faulted block + matching faulted section fence(s)."""
+    kwargs: dict[str, Any] = dict(
         vertical_exaggeration=vertical_exaggeration,
-        section_azimuth_deg=azimuth_deg,
-        section_elevation_deg=elevation_deg,
+        elevation_deg=elevation_deg,
         n_samples=n_samples,
         show_fault_plane=show_fault_plane,
         titles=titles,
     )
+    if azimuth_deg is not None:
+        kwargs["azimuth_deg"] = azimuth_deg
+    return plot_3d_block_and_section(block_faulted, start_xy, end_xy, **kwargs)
 
 
 def export_interactive_block_html(

@@ -696,11 +696,16 @@ def plot_geological_cross_section(
     show_dip_ticks: bool = True,
     show_swath_envelope: bool = True,
     show_eroded_projection: bool = True,
+    dip_tick_color: str = "#1f6feb",
+    section_labels: tuple[str, str] | None = None,
 ) -> tuple[Any, Any]:
     """
     Render a 2D geological cross-section showing the topographic profile, colored subsurface
     stratigraphic units, projected bedding horizons, eroded air-line projections, fault traces,
     and surface contact apparent dip ticks.
+
+    `section_labels=(start, end)` places labels inside the axes at the lower-left (start) and
+    lower-right (end) of the profile (e.g. `("A", "A'")`). Surface dip ticks default to blue.
     """
     if ax is None:
         fig, ax = plt.subplots(figsize=(11, 4.8))
@@ -802,7 +807,7 @@ def plot_geological_cross_section(
         )
     ax.plot(dist_m, z_topo, color="black", linewidth=2.2, label="Topographic Profile")
 
-    # Plot surface contact pins and apparent dip ticks
+    # Plot surface contact pins and apparent dip ticks (blue by default for README figures)
     if show_dip_ticks:
         tick_len_s = max(float(dist_m[-1] - dist_m[0]) * 0.032, 45.0)
         for c in section.get("contact_crossings", []):
@@ -814,11 +819,11 @@ def plot_geological_cross_section(
             ax.plot(
                 [s0, s0 + ds_tick],
                 [z0, z0 + dz_tick],
-                color="#d90000",
+                color=dip_tick_color,
                 linewidth=2.0,
                 zorder=6,
             )
-            ax.scatter([s0], [z0], color="#d90000", s=26, zorder=7)
+            ax.scatter([s0], [z0], color=dip_tick_color, s=26, zorder=7)
             ax.annotate(
                 f"{abs(app_dip):.0f}°",
                 xy=(s0, z0),
@@ -827,7 +832,7 @@ def plot_geological_cross_section(
                 ha="center",
                 fontsize=8,
                 fontweight="bold",
-                color="#990000",
+                color=dip_tick_color,
             )
 
     z_min_plot = float(z_levels.min())
@@ -836,6 +841,33 @@ def plot_geological_cross_section(
     ax.set_ylim(z_min_plot, z_max_plot)
     if vertical_exaggeration > 0:
         ax.set_aspect(float(vertical_exaggeration))
+
+    # End-member labels inside the frame (lower-left / lower-right)
+    if section_labels is not None:
+        s0, s1 = float(dist_m[0]), float(dist_m[-1])
+        z_lab = z_min_plot + 0.045 * (z_max_plot - z_min_plot)
+        ax.text(
+            s0 + 0.012 * (s1 - s0),
+            z_lab,
+            section_labels[0],
+            fontsize=12,
+            fontweight="bold",
+            color="#111111",
+            ha="left",
+            va="bottom",
+            zorder=12,
+        )
+        ax.text(
+            s1 - 0.012 * (s1 - s0),
+            z_lab,
+            section_labels[1],
+            fontsize=12,
+            fontweight="bold",
+            color="#111111",
+            ha="right",
+            va="bottom",
+            zorder=12,
+        )
 
     ax.set_xlabel("Distance Along Cross-Section Profile (m)")
     ax.set_ylabel("Elevation (m NAVD88)")
