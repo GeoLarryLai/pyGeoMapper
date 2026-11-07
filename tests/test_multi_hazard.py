@@ -197,10 +197,10 @@ def test_notebook_5_and_all_five_notebooks_executed() -> None:
         "case1b_chichi_thrust_earthquake.jpg",
         "case1c_kilauea_volcano.jpg",
         "case1d_jakobshavn_glacier.jpg",
-        "case1e_slumgullion_landslide.jpg",
+        "slumgullion_earthflow.png",
         "case2_landslide.png",
-        "case3_flood.png",
-        "case4_wildfire.png",
+        "yolo_bypass_flood.png",
+        "holiday_farm_fire.png",
         "case5_agriculture_urban.png",
     ):
         assert (REPO_ROOT / "image" / fig_name).is_file()

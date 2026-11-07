@@ -249,6 +249,12 @@ def test_3d_renderers_and_forge3d_adapter():
     )
     # Two panels only: left opaque block | right one box containing both A–A′ and B–B′ fences.
     assert len(axes5) == 2
+    # The solid left block is a single DEM/walls shell, never interior fences.
+    assert len(axes5[0].collections) == 1
+    assert len(fig5.legends) == 1
+    assert len(fig5.legends[0].get_texts()) == 8
+    assert fig5.legends[0]._ncols == 4
+    assert all(":" not in txt.get_text() for txt in fig5.legends[0].get_texts())
     # Left opaque block should carry section marks (black) and a red fault trace with ticks.
     assert any(ln.get_color() in ("#111111", "k", "black") for ln in axes5[0].get_lines())
     assert any(ln.get_color() == "#d62728" for ln in axes5[0].get_lines())
@@ -258,12 +264,19 @@ def test_3d_renderers_and_forge3d_adapter():
     # Both panels share the same camera.
     assert axes5[0].azim == axes5[1].azim == -78.0
     assert axes5[0].elev == axes5[1].elev == 28.0
+    # Both opaque fences share one per-triangle depth sort, plus transparent fault.
+    assert len(axes5[1].collections) == 2
+    intersections = [ln for ln in axes5[1].get_lines()
+                     if ln.get_color() == "#000000" and 0.8 <= ln.get_linewidth() <= 1.2]
+    assert len(intersections) == 1
+    ix, iy, iz = intersections[0].get_data_3d()
+    assert ix[0] == ix[1] and iy[0] == iy[1] and iz[1] > iz[0]
     plt.close(fig5)
 
 
 def test_notebook_4_executed_cleanly():
     """Saved notebook JSON only: every code cell has an execution count and output, and the figures exist.
-    This does NOT re-run the notebook; `outputs/` (HTML viewer, meshes) is untracked, so run notebook 4 locally first."""
+    This does NOT re-run the notebook; HTML viewer and mesh exports in `outputs/` are untracked."""
     nb_path = REPO_ROOT / "notebooks" / "pyGeoMapper_4_3d_block_diagram_and_viewer.ipynb"
     assert nb_path.exists()
     nb = json.loads(nb_path.read_text(encoding="utf-8"))
@@ -275,8 +288,162 @@ def test_notebook_4_executed_cleanly():
 
     for fig_name in (
         "3d_block_diagram.png",
+        "3d_block_diagram_rotate.gif",
         "3d_cutaway_and_fence.png",
         "surface_drape_comparison.png",
     ):
         assert (REPO_ROOT / "image" / fig_name).exists()
-    assert (REPO_ROOT / "outputs" / "sheep_mtn_3d_block_viewer.html").exists()
+    # The HTML viewer is an untracked local export, not a shipped test fixture.
+    assert "export_interactive_block_html" in "\n".join("".join(c["source"]) for c in code_cells)
+
+
+def _small_control_block():
+    """Small real Rust-built block for inexpensive plotting API regressions."""
+    rows, cols = 12, 14
+    xx, yy = np.meshgrid(np.arange(cols), np.arange(rows))
+    transform = (500000.0, 20.0, 0.0, 4900000.0, 0.0, -20.0)
+    dem = viewer_3d.GeoGrid(1200.0 + 2.0 * xx + yy, transform=transform)
+    geol = viewer_3d.GeoGrid((xx >= cols // 2).astype(np.int32), transform=transform)
+    start, end = (500020.0, 4899790.0), (500250.0, 4899970.0)
+    fault = cross_section.reconstruct_planar_fault(
+        dem, strike_deg=140.0, dip_deg=50.0, throw_m=30.0,
+        tip_xy=(500140.0, 4899880.0), z0=1210.0,
+    )
+    block = viewer_3d.build_3d_block_diagram(
+        dem, geol, [{"id": 0, "code": "U0", "color": "#aabbcc"},
+                    {"id": 1, "code": "U1", "color": "#eebb44"}],
+        z_bottom=950.0, nz=12, fault_spec=fault, include_fault=True,
+    )
+    return block, start, end
+
+
+def test_reviewed_defaults_and_surface_contact_controls():
+    block, start, end = _small_control_block()
+    # Unit colors must not have a second, baked-in pixel-width black outline.
+    rgb = block["surface_drape_rgba"][..., :3]
+    assert not np.any(np.all(rgb < 40, axis=-1))
+    fig, axes = viewer_3d.plot_3d_block_and_section(block, start, end, n_samples=20)
+    try:
+        assert all((ax.azim, ax.elev, ax.roll) == (-33.0, 28.0, 0.0) for ax in axes)
+        contacts = [ln for ln in axes[0].lines if ln.get_linewidth() == 0.4]
+        assert contacts
+        assert np.allclose(axes[0].collections[0].get_facecolor()[:, 3], 1.0)
+        assert np.allclose(axes[1].collections[0].get_facecolor()[:, 3], 1.0)
+        assert np.allclose(axes[1].collections[1].get_facecolor()[:, 3], 0.10)
+    finally:
+        plt.close(fig)
+
+    # 0 suppresses extra surface contact polylines; independent fill/fault controls.
+    fig, axes = viewer_3d.plot_3d_block_and_section(
+        block, start, end, n_samples=20, unit_boundary_linewidth=0,
+        fill_alpha=0.35, section_alpha=0.6, fault_alpha=0.04, show_fault_plane=False,
+    )
+    try:
+        assert not any(ln.get_linewidth() == 0.4 for ln in axes[0].lines)
+        assert not any(ln.get_color() == "#d62728" for ln in axes[0].lines)
+        assert len(axes[1].collections) == 1
+        assert np.allclose(axes[0].collections[0].get_facecolor()[:, 3], 0.35)
+        assert np.allclose(axes[1].collections[0].get_facecolor()[:, 3], 0.6)
+        assert "Thrust" not in [t.get_text() for t in fig.legends[0].get_texts()]
+    finally:
+        plt.close(fig)
+    fig, ax = viewer_3d.plot_3d_block_diagram(
+        block, unit_boundary_linewidth=0.85, show_attitudes=False, fill_alpha=0,
+    )
+    try:
+        assert any(ln.get_linewidth() == 0.85 for ln in ax.lines)
+        assert np.allclose(ax.collections[0].get_facecolor()[:, 3], 0.0)
+    finally:
+        plt.close(fig)
+
+
+def test_independent_section_and_fault_alpha_controls():
+    block, start, end = _small_control_block()
+    panels = viewer_3d.slice_3d_fence_diagram(block, transects=[(start, end)], n_samples=20)
+    for section_alpha, fault_alpha in [(0.6, 0.04), (0.0, 0.0)]:
+        fig, ax = viewer_3d.plot_3d_fence_diagram(
+            block, fence_panels=panels, section_alpha=section_alpha,
+            fault_alpha=fault_alpha, show_wireframe_surface=False,
+        )
+        try:
+            assert np.allclose(ax.collections[0].get_facecolor()[:, 3], section_alpha)
+            assert np.allclose(ax.collections[1].get_facecolor()[:, 3], fault_alpha)
+        finally:
+            plt.close(fig)
+
+
+def test_look_toward_camera_conversion_and_legacy_aliases():
+    block, start, end = _small_control_block()
+    fig, old = viewer_3d.plot_3d_block_and_section(
+        block, start, end, n_samples=20, azimuth_deg=-33, elevation_deg=28,
+    )
+    fig2, new = viewer_3d.plot_3d_block_and_section(
+        block, start, end, n_samples=20, azimuth_deg=70, elevation_deg=5,
+        block_azimuth_deg=80, section_azimuth_deg=90, section_elevation_deg=6,
+        look_azimuth_deg=147, look_elevation_deg=28, roll_deg=0,
+    )
+    try:
+        for a, b in zip(old, new):
+            assert np.allclose(a.get_proj(), b.get_proj())
+            assert (b.azim, b.elev, b.roll) == (-33.0, 28.0, 0.0)
+    finally:
+        plt.close(fig)
+        plt.close(fig2)
+
+    fig, axes = viewer_3d.plot_3d_block_and_section(
+        block, start, end, n_samples=20, look_azimuth_deg=90,
+        look_elevation_deg=35, roll_deg=12,
+    )
+    try:
+        assert all((ax.azim, ax.elev, ax.roll) == (-90.0, 35.0, 12.0) for ax in axes)
+    finally:
+        plt.close(fig)
+
+    # Horizontal look-toward 90 means camera is at -90, looking along +y.
+    # Check the installed Matplotlib view vector as well as stored view_init angles.
+    for plot in (viewer_3d.plot_3d_block_diagram, viewer_3d.plot_3d_fence_diagram):
+        fig, ax = plot(block, azimuth_deg=33, elevation_deg=11,
+                       look_azimuth_deg=90, look_elevation_deg=35, roll_deg=12)
+        try:
+            assert (ax.azim, ax.elev, ax.roll) == (-90.0, 35.0, 12.0)
+            ax.get_proj()
+            look = -np.asarray(ax._view_w)
+            expected = [0.0, np.cos(np.deg2rad(35)), -np.sin(np.deg2rad(35))]
+            assert np.allclose(look, expected, atol=1e-12)
+        finally:
+            plt.close(fig)
+    # New names override only their corresponding old angle; wrapping is periodic.
+    assert viewer_3d._resolve_3d_view(20, 11, 507, None, 7) == (-33.0, 11.0, 7.0)
+    assert viewer_3d._resolve_3d_view(20, 11, None, 42, 7) == (20.0, 42.0, 7.0)
+
+
+def test_animation_rotates_both_cameras_and_keeps_timing(tmp_path, monkeypatch):
+    from PIL import Image
+    from mpl_toolkits.mplot3d import Axes3D
+
+    block, start, end = _small_control_block()
+    original = Axes3D.view_init
+    views = {}
+
+    def record(self, *args, **kwargs):
+        result = original(self, *args, **kwargs)
+        views.setdefault(self, []).append((self.azim, self.elev, self.roll))
+        return result
+
+    monkeypatch.setattr(Axes3D, "view_init", record)
+    path = viewer_3d.animate_3d_block_and_section(
+        block, start, end, tmp_path / "nested" / "rotation.gif",
+        frames=4, fps=3, n_samples=20, azimuth_deg=-33, elevation_deg=28,
+    )
+    assert path.is_file()
+    assert len(views) == 2
+    expected = [(-33 + angle, 28, 0) for angle in (0, 90, 180, 270)]
+    for history in views.values():
+        assert history[-4:] == expected
+    with Image.open(path) as image:
+        assert image.n_frames == 4
+        assert image.width <= 1400
+        assert image.info["loop"] == 0
+        for i in range(image.n_frames):
+            image.seek(i)
+            assert image.info["duration"] == 330

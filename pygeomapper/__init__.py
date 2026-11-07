@@ -19,7 +19,9 @@ from . import (
     terrain_analysis,
     viewer_3d,
 )
-from .raster_io import GeoGrid, RasterStack
+from .raster_io import GeoGrid, RasterStack, blend_dem
+from .surface_change import compute_los_from_unwrapped_phase
+from .viewer_3d import animate_3d_block_and_section
 
 try:
     from . import _core
@@ -29,13 +31,16 @@ except ImportError:  # pragma: no cover
     _core = None
     HAS_RUST_CORE = False
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "__version__",
     "HAS_RUST_CORE",
     "GeoGrid",
     "RasterStack",
+    "blend_dem",
+    "compute_los_from_unwrapped_phase",
+    "animate_3d_block_and_section",
     "raster_io",
     "spectral_indices",
     "surface_change",

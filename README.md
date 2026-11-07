@@ -2,7 +2,7 @@
 <p align="center">
 <a href="https://doi.org/10.5281/zenodo.23832020"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23832020-blue" alt="DOI"></a> <a href="https://github.com/GeoLarryLai/pyGeoMapper/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-lightgrey" alt="License"></a>
 <br>
-<a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/pypi/v/pygeomapper?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pygeomapper"><img src="https://img.shields.io/pepy/dt/pygeomapper?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a> <a href="https://anaconda.org/conda-forge/pygeomapper"><img src="https://img.shields.io/conda/vn/conda-forge/pygeomapper?label=conda-forge&color=green" alt="conda-forge version"></a> <a href="https://anaconda.org/conda-forge/pygeomapper"><img src="https://img.shields.io/conda/dn/conda-forge/pygeomapper?label=conda%20downloads&color=green" alt="conda downloads"></a>
+<a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/badge/python-3.10%2B-lightgrey" alt="Python versions"></a> <a href="https://pypi.org/project/pygeomapper/"><img src="https://img.shields.io/pypi/v/pygeomapper?color=orange" alt="PyPI version"></a> <a href="https://pepy.tech/projects/pygeomapper"><img src="https://img.shields.io/pepy/dt/pygeomapper?label=pypi%20downloads&color=orange" alt="PyPI downloads"></a>
 </p>
 
 # pyGeoMapper
@@ -21,7 +21,7 @@ git clone https://github.com/GeoLarryLai/pyGeoMapper.git && cd pyGeoMapper
 pip install maturin && maturin develop --release
 ```
 
-`pip install pygeomapper` includes the `forge3d` 3D terrain renderer. If you installed from conda and the renderer is missing, run `pip install forge3d`; otherwise `viewer_3d` falls back to its built-in renderer automatically.
+`pip install pygeomapper` includes the `forge3d` 3D terrain renderer. If the renderer is missing, run `pip install forge3d`; otherwise `viewer_3d` falls back to its built-in renderer automatically.
 
 ## Citation
 
@@ -37,38 +37,61 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 [Staley et al. (2017)](https://doi.org/10.1016/j.geomorph.2016.10.019),
 [Horton et al. (2017)](https://doi.org/10.3133/ds1052). Data sources: `example_data/SOURCES.txt`, `NOTICE`.
 
-![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
-*DEM of Difference (red = erosion, blue = deposit) and spectral change after the 2014 Oso landslide, the two basic ways the package spots change on the ground.*
-
 ## What it can do
 
-- Measure surface change: DEM of Difference with co-registration, spectral change, and InSAR/GNSS 3D displacement (offset tracking, wrapped phase, horizontal and vertical motion)
-- Compute spectral indices (NDVI, NBR, NDWI, mineral ratios) and terrain metrics (slope, curvature, roughness, multiscale CWT complexity)
-- Make unsupervised and supervised geologic unit maps, with spatial-block holdout accuracy
-- Draw cross-sections and 3D block, cutaway and fence diagrams, and view them in an offline WebGL viewer
-- Five executed notebooks walk through every module with public data
+- Map terrain and surface features: spectral indices plus slope, curvature, roughness, and multiscale CWT complexity
+- Make supervised geologic unit maps from AlphaEarth embeddings and other features, scored against a geologic map
+- Reconstruct those maps as cross-sections and 3D geologic models you can open in a browser
+- Detect surface change at different temporal and spatial scales: DEM of Difference, spectral change, and InSAR, including landslides, fires, floods, earthquakes, earthflows, and glaciers
 
-## Examples
+## Landscape features and geologic mapping
 
-![Myanmar 2025 earthquake LiCSAR](image/case1a_myanmar_earthquake.jpg)
-*2025 Mw 7.7 Myanmar (Sagaing): real Sentinel-1 COMET LiCSAR — N–S displacement with arrows, azimuth and range offsets, and wrapped phase on GLO-30 hillshade (tracks 106D / 070A).*
+This part covers automated geologic mapping with supervised machine learning. Models are trained from geomorphic surface features and surface-geology constraints, then the mapped units are reconstructed as cross-sections and a 3D structural model.
 
 ![Multiscale CWT complexity](image/cwt_multiscale.png)
-*2D Mexican-hat CWT at Sheep Mountain: DEM, ridges/valleys, mean complexity on hillshade, two-column A–A′ energy profile, and dominant wavelength on hillshade.*
+*Sheep Mountain, Wyoming: 2D Mexican-hat CWT — DEM, ridges and valleys, mean complexity, A–A′ energy profile, and dominant wavelength.*
 
-![Oso landslide Δ complexity](image/oso_landslide_complexity.png)
-*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and Δ complexity (post − pre) over hillshade. No co-event InSAR in the package.*
+![Automatic geologic mapping at Sheep Mountain](image/auto_mapping_validation.png)
+*Automatic geologic mapping at Sheep Mountain, Wyoming, from 64-band AlphaEarth embeddings. USGS map units in the northwest half trained the model; the southeast half was held out (validation accuracy 91.0%, macro-F1 0.89).*
 
-![Auto-mapping validation](image/auto_mapping_validation.png)
-*Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
+| Method | Bands | Validation accuracy | Macro-F1 |
+| :--- | ---: | ---: | ---: |
+| Engineered spectral and terrain | 29 | 69.1% | 0.64 |
+| AlphaEarth embeddings | 64 | 91.0% | 0.89 |
+| Combined | 93 | 89.5% | 0.87 |
 
 ![Cross-section](image/cross_section.png)
-*Sheep Mountain A–A′ and B–B′ (~60° apart) from 3-point bed attitudes with the published SW-dipping ~50° basement thrust (tip/throw inferred for the shallow section).*
+*Sheep Mountain, Wyoming: A–A′ and B–B′ (~60° apart) from 3-point bed attitudes, with the published SW-dipping ~50° basement thrust.*
 
-![3D geological block diagram](image/3d_block_diagram.png)
-*Opaque 3D geologic block with A–A′ and B–B′ marked (left) and both matching faulted 3D sections in one view (right) with a light transparent basement-thrust plane; shared camera (original view + 20° clockwise).*
+![Rotating Sheep Mountain block and sections](image/3d_block_diagram_rotate.gif)
+*Sheep Mountain, Wyoming: an opaque geologic block and the matching faulted A–A′ and B–B′ sections rotate together, 72 frames at 3 fps (about 24 seconds per turn).*
 
-Five executed notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
+## Surface change
+
+This part is a set of toolkits for detecting surface change at different temporal and spatial scales, using a range of remote-sensing data types and methods.
+
+![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
+*2014 Oso landslide, Washington: DEM of Difference (red = erosion, blue = deposit) and spectral change, the two basic ways the package spots change on the ground.*
+
+![Oso landslide Δ complexity](image/oso_landslide_complexity.png)
+*2014 Oso landslide, Washington: pre DEM and 2013 NAIP, post DEM and 2017 Sentinel-2, and the change in terrain complexity.*
+
+![Holiday Farm Fire, Oregon](image/holiday_farm_fire.png)
+*2020 Holiday Farm Fire, Oregon: Sentinel-2 SWIR–NIR–red composites before and after the fire, and the burn-ratio change (ΔNBR). The cyan outline marks higher debris-flow hazard.*
+
+![Yolo Bypass Flood, California](image/yolo_bypass_flood.png)
+*2019 Yolo Bypass flood, California: Sentinel-2 before and during the flood, and the water-index change (ΔNDWI). The cyan outline is the mapped shoreline.*
+
+![Myanmar 2025 earthquake LiCSAR](image/case1a_myanmar_earthquake.jpg)
+*2025 Mw 7.7 earthquake on the Sagaing Fault, Myanmar: Sentinel-1 LiCSAR north–south displacement, azimuth and range offsets, and wrapped phase.*
+
+![Slumgullion Earthflow, Colorado](image/slumgullion_earthflow.png)
+*Slumgullion Earthflow, Colorado: NAIP optical velocity (2017–2023), package-computed UAVSAR LOS and rewrapped phase (12–19 August 2011), and 2024−2015 elevation change (red = lowering, blue = raising). Arrows are optical motion only.*
+
+![Jakobshavn ITS_LIVE glacier velocity](image/case1d_jakobshavn_glacier.jpg)
+*Jakobshavn Isbræ, West Greenland: NASA ITS_LIVE surface velocity in 2018 with flow directions, and the 2018−2016 change in speed.*
+
+Five notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).
 
 ## Quick start

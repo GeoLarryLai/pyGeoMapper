@@ -3,7 +3,9 @@
 """Regenerate README science figures from the current 0.2 package (no git PNG blobs)."""
 from __future__ import annotations
 
+import argparse
 import json
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -31,16 +33,28 @@ IMG = ROOT / "image"
 DATA = ROOT / "example_data"
 HAZ = DATA / "hazards"
 IMG.mkdir(exist_ok=True)
-ART = Path("/opt/cursor/artifacts")
-ART.mkdir(parents=True, exist_ok=True)
+# Approved boards can be imported with --approved-dir; no machine-specific paths.
+APPROVED_ASSETS = {
+    "cwt_multiscale.png": "cwt_multiscale_gap_fixed.png",
+    "3d_block_diagram.png": "3d_block_diagram_legend_gap.png",
+    "3d_block_diagram_rotate.gif": "3d_block_diagram_rotate.gif",
+    "slumgullion_earthflow.png": "slumgullion_combined_package.png",
+}
 
 
-def _copy_artifact(path: Path) -> None:
-    import shutil
-
-    dest = ART / path.name
-    shutil.copy2(path, dest)
-    print(f"artifact: {dest} ({dest.stat().st_size / 1e3:.0f} KB)")
+def copy_approved_assets(source_dir: Path) -> list[Path]:
+    """Install reviewed pixels without changing layout, color, or GIF timing."""
+    sources = [source_dir / name for name in APPROVED_ASSETS.values()]
+    for source in sources:
+        if not source.is_file():
+            raise FileNotFoundError(source)
+    outputs = []
+    for dest_name, source_name in APPROVED_ASSETS.items():
+        source, dest = source_dir / source_name, IMG / dest_name
+        if source.resolve() != dest.resolve():
+            shutil.copy2(source, dest)
+        outputs.append(dest)
+    return outputs
 
 
 def _rgba_overlay_from_values(
@@ -96,9 +110,9 @@ def regenerate_cwt_multiscale() -> Path:
         sheep_dem, scales_m=[30.0, 60.0, 120.0, 220.0]
     )
 
-    # Slightly shorter canvas + tighter vertical pads so rows sit closer after equal-aspect shrink.
-    fig = plt.figure(figsize=(16.0, 9.2), layout="constrained")
-    fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.02, hspace=0.02, wspace=0.05)
+    # Approved canvas and styling; lift bottom row only by a safe, measured amount.
+    fig = plt.figure(figsize=(16.0, 10.2), layout="constrained")
+    fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.05, hspace=0.08, wspace=0.05)
     gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 0.92])
     ax_a = fig.add_subplot(gs[0, 0])
     ax_b = fig.add_subplot(gs[0, 1])
@@ -245,12 +259,13 @@ def regenerate_cwt_multiscale() -> Path:
 
     # Vertical gap between bottom of top-row axes and top of bottom-row axes (figure coords).
     gap = float(pos_top.y0 - (pos_e.y0 + pos_e.height))
-    if gap > 0.012:
-        # Leave a small visual margin (~0.010 fig fraction); shift the rest upward.
-        dy = gap - 0.010
-        for ax in (ax_prof, ax_prof2, ax_lam):
+    if gap > 0.105:
+        # Preserve room for top-row tick labels/x labels and bottom-row titles.
+        dy = gap - 0.105
+        for ax in (ax_prof, ax_lam):
             p = ax.get_position()
             ax.set_position([p.x0, p.y0 + dy, p.width, p.height])
+        # twinx axes share their position: moving ax_prof already moves ax_prof2.
         # Keep (e)'s colorbar glued to the lifted map axes.
         pos_e2 = ax_lam.get_position()
         for cax in fig.axes:
@@ -386,8 +401,8 @@ SHEEP_SECTIONS = (
     (SHEEP_AA[0], SHEEP_AA[1], "A", "A'"),
     (SHEEP_BB[0], SHEEP_BB[1], "B", "B'"),
 )
-# Shared 3D camera: original "good" SE view (−58°) + 20° clockwise (not the later ~30° ugly view).
-SHEEP_3D_AZIMUTH_DEG = -78.0
+# Shared 3D camera: two-panel baseline (−78°) yawed +45° so the right/east side turns toward the viewer.
+SHEEP_3D_AZIMUTH_DEG = -33.0
 SHEEP_3D_ELEVATION_DEG = 28.0
 
 
@@ -458,7 +473,7 @@ def regenerate_cross_section() -> Path:
     return out
 
 
-def regenerate_3d_block() -> tuple[Path, Path]:
+def regenerate_3d_block() -> tuple[Path, Path, Path]:
     dem = raster_io.load_geotiff(DATA / "sheep_mtn_dem_3dep.tif")
     geol = raster_io.load_geotiff(DATA / "sheep_mtn_geol_units.tif")
     units_meta = json.loads((DATA / "sheep_mtn_units.json").read_text())
@@ -478,10 +493,7 @@ def regenerate_3d_block() -> tuple[Path, Path]:
     )
 
     # Opaque solid block | one right-hand box with both A–A′ & B–B′ fences; shared camera.
-    fig, _ = viewer_3d.plot_3d_block_and_section(
-        block_f,
-        start_xy,
-        end_xy,
+    plot_kwargs = dict(
         sections=SHEEP_SECTIONS,
         vertical_exaggeration=1.7,
         azimuth_deg=SHEEP_3D_AZIMUTH_DEG,
@@ -490,13 +502,14 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         show_fault_plane=True,
         top_stride=2,
         wall_stride=2,
-        section_alpha=1.0,
-        fault_alpha=0.10,
         titles=(
             "(a) 3D geologic block with A–A′ & B–B′ section locations",
             f"(b) Matching 3D sections A–A′ & B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
             f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
         ),
+    )
+    fig, _ = viewer_3d.plot_3d_block_and_section(
+        block_f, start_xy, end_xy, **plot_kwargs
     )
     out1 = IMG / "3d_block_diagram.png"
     plotting.save_figure(fig, out1, max_width_px=1500, palette=False)
@@ -536,7 +549,13 @@ def regenerate_3d_block() -> tuple[Path, Path]:
     out2 = IMG / "3d_cutaway_and_fence.png"
     plotting.save_figure(fig, out2, max_width_px=1500)
     plt.close(fig)
-    return out1, out2
+    gif_kwargs = dict(plot_kwargs)
+    gif_kwargs["titles"] = ("", "")
+    out_gif = viewer_3d.animate_3d_block_and_section(
+        block_f, start_xy, end_xy, IMG / "3d_block_diagram_rotate.gif",
+        frames=72, fps=3, **gif_kwargs,
+    )
+    return out1, out2, out_gif
 
 
 def regenerate_case1a() -> Path:
@@ -746,21 +765,30 @@ def regenerate_case1a() -> Path:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--approved-dir", type=Path,
+        help="Copy the four reviewed boards from this directory instead of rendering.",
+    )
+    args = parser.parse_args()
     t0 = time.perf_counter()
-    outs = []
-    print("=== CWT Sheep Mountain board ===")
-    outs.append(regenerate_cwt_multiscale())
-    print("=== Oso landslide complexity board ===")
-    outs.append(regenerate_oso_landslide())
-    print("=== cross-section ===")
-    outs.append(regenerate_cross_section())
-    print("=== 3D A–A′ / B–B′ ===")
-    outs.extend(regenerate_3d_block())
-    print("=== Case 1A LiCSAR 4-panel ===")
-    outs.append(regenerate_case1a())
-    for p in outs:
-        print(f"saved {p} ({p.stat().st_size / 1e3:.0f} KB)")
-        _copy_artifact(p)
+    if args.approved_dir is not None:
+        outs = copy_approved_assets(args.approved_dir)
+    else:
+        print("=== CWT Sheep Mountain board ===")
+        outs = [regenerate_cwt_multiscale()]
+        print("=== 3D A–A′ / B–B′ still and rotation (72 frames, 3 fps) ===")
+        outs.extend(regenerate_3d_block())
+        # UAVSAR phase and the dated surface rasters are not bundled. Keep the
+        # approved 2×2 board rather than substitute optical-only panels or new data.
+        slumgullion = IMG / "slumgullion_earthflow.png"
+        if not slumgullion.is_file():
+            raise FileNotFoundError("Restore the shipped Slumgullion board or use --approved-dir")
+        outs.append(slumgullion)
+        print("Slumgullion: retained approved board (full UAVSAR/DSM inputs not bundled)")
+    # Myanmar, Oso, cross-section, auto-mapping, and ITS_LIVE velocity stay as shipped.
+    for path in outs:
+        print(f"saved {path.relative_to(ROOT)} ({path.stat().st_size / 1e3:.0f} KB)")
     print(f"done in {time.perf_counter() - t0:.1f}s")
 
 

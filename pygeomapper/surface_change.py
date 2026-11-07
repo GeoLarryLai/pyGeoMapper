@@ -386,6 +386,47 @@ def compute_displacement_strain(
 
 
 
+def compute_los_from_unwrapped_phase(
+    phase_rad: GeoGrid | np.ndarray,
+    wavelength_m: float,
+    *,
+    phase_reference: float | None = None,
+) -> GeoGrid | np.ndarray:
+    """Convert already-unwrapped interferometric phase (radians) to LOS metres.
+
+    ``u_los = (phase_rad - phase_reference) * wavelength_m / (4 * pi)``.
+    ``phase_reference=None`` means zero; callers may supply a constant reference
+    in radians, for example the median phase over independently selected stable
+    terrain. No atmospheric correction or spatial ramp detrending is applied.
+
+    For the UAVSAR ``SLC1 * conj(SLC2)`` convention, positive LOS means range
+    increase (motion away from the radar). Other input phase conventions must
+    be reconciled by the caller. One 2*pi cycle corresponds to wavelength_m/2
+    metres; wrapped phase alone cannot recover the integer-cycle displacement.
+    This converts a processed phase product, not raw SLCs into an interferogram.
+
+    ``wavelength_m`` must be finite and positive, and the reference finite.
+    NaN/nonfinite input cells (and a GeoGrid's nodata cells) become NaN. GeoGrid
+    output retains georeferencing and metadata with units ``m``; ndarray input
+    returns a float64 ndarray. Inputs are not modified. The result can be
+    rewrapped with :func:`compute_insar_wrapped_phase` using the same wavelength.
+    """
+    wavelength = float(wavelength_m)
+    if not np.isfinite(wavelength) or wavelength <= 0:
+        raise ValueError("wavelength_m must be finite and positive")
+    reference = 0.0 if phase_reference is None else float(phase_reference)
+    if not np.isfinite(reference):
+        raise ValueError("phase_reference must be finite or None")
+
+    grid = phase_rad if isinstance(phase_rad, GeoGrid) else None
+    arr = np.asarray(grid.data if grid is not None else phase_rad, dtype=np.float64)
+    valid = grid.valid_mask() if grid is not None else np.isfinite(arr)
+    los = np.where(valid, (arr - reference) * (wavelength / (4 * np.pi)), np.nan)
+    if grid is not None:
+        return grid.with_data(los, name="insar_los_displacement_m", units="m", nodata=np.nan)
+    return los
+
+
 def compute_insar_wrapped_phase(
     los_disp_m: GeoGrid | np.ndarray,
     wavelength_m: float = 0.05546576,

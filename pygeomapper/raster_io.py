@@ -626,6 +626,85 @@ def align_to_reference(
     )
 
 
+def blend_dem(
+    base: GeoGrid,
+    detail: GeoGrid,
+    *,
+    feather_pixels: float = 15,
+    match_vertical: bool = True,
+) -> GeoGrid:
+    """Fill a patchy DEM with a bilinearly aligned lower-resolution base.
+
+    The result uses the detail grid, CRS and units. Valid detail is preserved
+    except in an optional inward edge feather; holes use the base, and pixels
+    missing in both inputs remain NaN. Inputs are not modified. Both inputs
+    must already use compatible height units and vertical references.
+
+    ``match_vertical`` adds median(detail - aligned base) over their valid
+    overlap to the *base only*. This is a global visual seam correction, not
+    spatial coregistration or a vertical-datum conversion. No overlap means
+    no shift. The applied shift (in input height units), overlap count and
+    controls are recorded in ``result.metadata["blend_dem"]``.
+
+    ``feather_pixels`` is a nonnegative width in detail-grid pixels (0 turns
+    feathering off). A smoothstep distance weight rises from pure base at
+    the first valid detail edge pixel to pure detail beyond this width.
+    Where the base is missing, valid detail is always retained, even at edges.
+    Raster boundaries themselves are not treated as missing-data edges.
+
+    This produces a mixed-source topographic surface, not a dated DEM for
+    elevation-change analysis; compute change from original dated inputs.
+    """
+    if not np.isfinite(feather_pixels) or feather_pixels < 0:
+        raise ValueError("feather_pixels must be finite and nonnegative")
+
+    # Normalize finite nodata sentinels before interpolation: align_to_reference
+    # expects NaN nodata, and interpolating a sentinel would contaminate heights.
+    base_clean = base.with_data(
+        np.where(base.valid_mask(), base.data, np.nan), nodata=np.nan
+    )
+    aligned = align_to_reference(base_clean, detail, resampling="bilinear")
+    base_valid = aligned.valid_mask()
+    detail_valid = detail.valid_mask()
+    overlap = base_valid & detail_valid
+    overlap_count = int(np.count_nonzero(overlap))
+    shift = (
+        float(np.median(detail.data[overlap] - aligned.data[overlap]))
+        if match_vertical and overlap_count else 0.0
+    )
+    result = np.where(base_valid, aligned.data + shift, np.nan)
+    result[detail_valid] = detail.data[detail_valid]
+
+    if feather_pixels > 0 and overlap_count and not detail_valid.all():
+        from scipy.ndimage import distance_transform_edt
+
+        distance = distance_transform_edt(detail_valid)
+        edge = overlap & (distance < feather_pixels + 1)
+        weight = np.clip((distance[edge] - 1) / feather_pixels, 0, 1)
+        weight = weight * weight * (3 - 2 * weight)
+        result[edge] = (
+            weight * detail.data[edge]
+            + (1 - weight) * (aligned.data[edge] + shift)
+        )
+
+    return detail.with_data(
+        result,
+        nodata=np.nan,
+        name=f"{detail.name}_blended",
+        metadata={
+            "blend_dem": {
+                "base_name": base.name,
+                "detail_name": detail.name,
+                "base_vertical_shift": shift,
+                "shift_units": detail.units,
+                "overlap_pixels": overlap_count,
+                "match_vertical": bool(match_vertical),
+                "feather_pixels": float(feather_pixels),
+            }
+        },
+    )
+
+
 def search_stac_scenes(
     bbox_lonlat: tuple[float, float, float, float],
     datetime_range: str,
