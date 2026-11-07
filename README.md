@@ -60,7 +60,7 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 This part covers automated geologic mapping with supervised machine learning. Models are trained from geomorphic surface features and surface-geology constraints, then the mapped units are reconstructed as cross-sections and a 3D structural model.
 
 ![Multiscale CWT complexity](image/cwt_multiscale.png)
-*Sheep Mountain, Wyoming — **DEM** + 2D Mexican-hat **continuous wavelet transform** ([pyTopocomplexity](https://github.com/GeoLarryLai/pyTopocomplexity)): ridges and valleys, mean complexity, A–A′ energy profile, and dominant wavelength.*
+*Sheep Mountain, Wyoming — **DEM** + 2D Mexican-hat **continuous wavelet transform** ([pyTopoComplexity](https://github.com/GeoLarryLai/pyTopoComplexity)): ridges and valleys, mean complexity, A–A′ energy profile, and dominant wavelength.*
 
 ![Automatic geologic mapping at Sheep Mountain](image/auto_mapping_validation.png)
 *Sheep Mountain, Wyoming — **64-band AlphaEarth embeddings** + **supervised ML**, trained on USGS geologic map units in the northwest half and validated on the held-out southeast half (accuracy 91.0%, macro-F1 0.89).*
@@ -82,7 +82,7 @@ This part covers automated geologic mapping with supervised machine learning. Mo
 This part is a set of toolkits for detecting surface change at different temporal and spatial scales, using a range of remote-sensing data types and methods.
 
 ![2014 Oso landslide, Washington](image/oso_landslide.png)
-*2014 Oso landslide, Washington — **DEMs** (pre COP30, post 3DEP lidar) → DEM of Difference (red = erosion, blue = deposit); **Sentinel-2** spectral change (ΔNDVI, ΔNBR); and terrain Δ complexity via CWT ([pyTopocomplexity](https://github.com/GeoLarryLai/pyTopocomplexity)).*
+*2014 Oso landslide, Washington — **DEMs** (pre COP30, post 3DEP lidar) → DEM of Difference (red = erosion, blue = deposit); **Sentinel-2** spectral change (ΔNDVI, ΔNBR); and terrain Δ complexity via CWT ([pyTopoComplexity](https://github.com/GeoLarryLai/pyTopoComplexity)).*
 
 ![Holiday Farm Fire, Oregon](image/holiday_farm_fire.png)
 *2020 Holiday Farm Fire, Oregon — **Sentinel-2** SWIR–NIR–red composites before and after, and **burn-ratio change (ΔNBR)**; cyan outline marks higher debris-flow hazard.*

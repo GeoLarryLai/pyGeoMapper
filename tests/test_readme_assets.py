@@ -94,7 +94,7 @@ def test_readme_gallery_uses_restored_science_figures() -> None:
     assert "image/dod_and_spectral_change.png" not in text
     assert "image/oso_landslide_complexity.png" not in text
     assert text.count("image/oso_landslide") == 1
-    assert "github.com/GeoLarryLai/pyTopocomplexity" in text
+    assert "github.com/GeoLarryLai/pyTopoComplexity" in text
     assert (REPO_ROOT / "image" / "oso_landslide.png").is_file()
     assert "SW-dipping" in text or "basement thrust" in text
     assert "NE-dipping forelimb reverse fault" not in text
