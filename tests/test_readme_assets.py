@@ -62,23 +62,25 @@ def test_pypi_readme_images_are_subset_of_github_readme() -> None:
 
 
 def test_readme_gallery_uses_restored_science_figures() -> None:
-    """GitHub README must show LiCSAR, Sheep Mountain CWT board, Oso DoD, and dual-section 3D."""
+    """GitHub README must show LiCSAR, Sheep Mountain CWT board, Oso Δcomplexity, and dual-section 3D."""
     text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     for required in (
         "image/case1a_myanmar_earthquake.jpg",
         "image/cwt_multiscale.png",
-        "image/oso_landslide_dod.png",
+        "image/oso_landslide_complexity.png",
         "image/3d_block_diagram.png",
         "image/cross_section.png",
     ):
         assert required in text, f"README missing {required}"
     assert "image/myanmar_insar_3d.jpg" not in text
     assert "image/oso_cwt_change.png" not in text
+    assert "image/oso_landslide_dod.png" not in text
     assert "SW-dipping" in text or "basement thrust" in text
     assert "NE-dipping forelimb reverse fault" not in text
-    assert "Oso Δcomplexity" not in text
-    assert (REPO_ROOT / "image" / "oso_landslide_dod.png").is_file()
+    assert "Δ complexity" in text or "delta complexity" in text.lower()
+    assert (REPO_ROOT / "image" / "oso_landslide_complexity.png").is_file()
     assert not (REPO_ROOT / "image" / "oso_cwt_change.png").exists()
+    assert not (REPO_ROOT / "image" / "oso_landslide_dod.png").exists()
 
 
 def test_no_machine_absolute_paths_in_shipped_files() -> None:

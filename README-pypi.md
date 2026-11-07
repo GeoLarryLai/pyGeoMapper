@@ -75,8 +75,8 @@ cwt = terrain_analysis.compute_multiscale_complexity(dem2)          # terrain ro
 ![Multiscale CWT complexity](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/cwt_multiscale.png)
 *2D Mexican-hat CWT at Sheep Mountain: DEM, ridges/valleys, mean complexity on hillshade, two-column A–A′ energy profile, and dominant wavelength on hillshade.*
 
-![Oso landslide DoD](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/oso_landslide_dod.png)
-*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and DEM of Difference (red = erosion, blue = deposit). No co-event InSAR in the package.*
+![Oso landslide Δ complexity](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/oso_landslide_complexity.png)
+*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and Δ complexity (post − pre) over hillshade. No co-event InSAR in the package.*
 
 ![Auto-mapping validation](https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*

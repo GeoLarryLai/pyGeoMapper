@@ -246,14 +246,13 @@ def regenerate_cwt_multiscale() -> Path:
 
 
 def regenerate_oso_landslide() -> Path:
-    """Dedicated Oso README figure: pre/post DEM+imagery drapes and DoD.
+    """Dedicated Oso README figure: pre/post DEM+imagery drapes and Δ complexity (post − pre).
 
-    InSAR around the March 2014 failure is not in the package (Sentinel-1 launched after;
-    available ALOS/UAVSAR pairs are pre-creep or 2020–21, not co-event with these DEMs),
-    so this ships panels (a)–(c) only.
+    Panel (c) follows the older Sheep Mountain board subplot (e): hillshade under a
+    diverging PuOr_r ΔMean Complexity overlay. InSAR around the March 2014 failure is not
+    in the package (Sentinel-1 launched after; available ALOS/UAVSAR pairs are pre-creep or
+    2020–21, not co-event with these DEMs), so this ships panels (a)–(c) only.
     """
-    from pygeomapper import surface_change
-
     dem_pre = raster_io.load_geotiff(DATA / "oso_dem_pre_cop30.tif")
     dem_post = raster_io.load_geotiff(DATA / "oso_dem_post_3dep.tif")
     s2_post = raster_io.load_multiband_geotiff(
@@ -280,11 +279,13 @@ def regenerate_oso_landslide() -> Path:
 
     hs_pre = terrain_analysis.compute_hillshade(dem_pre)
     hs_post = terrain_analysis.compute_hillshade(dem_post)
-    raw_dod = surface_change.compute_dod(dem_pre, dem_post)
-    stable = np.abs(raw_dod["raw_dod"].data) < 4.0
-    dod_res = surface_change.compute_dod(dem_pre, dem_post, detrend_stable_mask=stable)
-    dod = dod_res["dod"]
-    vol = surface_change.compute_volume_budget(dod, lod_threshold=2.0)
+    # Same scales / style as the older README subplot (e) Oso Δ complexity panel.
+    oso_comp = terrain_analysis.compare_complexity_change(
+        dem_pre, dem_post, scales_m=[15.0, 30.0, 60.0, 120.0]
+    )
+    delta_c = np.asarray(oso_comp["delta_complexity"].data, dtype=np.float64)
+    vlim = float(np.nanpercentile(np.abs(delta_c), 98))
+    vlim = max(vlim, 1.0)
 
     ext = [
         dem_post.bounds[0] / 1e3,
@@ -296,7 +297,7 @@ def regenerate_oso_landslide() -> Path:
 
     fig, axes = plt.subplots(1, 3, figsize=(15.5, 5.0), layout="constrained")
     fig.suptitle(
-        "2014 Oso landslide (WA) — pre/post DEM drapes and DEM of Difference",
+        "2014 Oso landslide (WA) — pre/post DEM drapes and Δ complexity",
         fontsize=12.5,
         fontweight="bold",
     )
@@ -319,18 +320,18 @@ def regenerate_oso_landslide() -> Path:
     )
 
     axes[2].imshow(hs_post.data, cmap="gray", extent=ext, origin="upper")
-    dod_masked = np.ma.masked_inside(dod.data, -2.0, 2.0)
     im = axes[2].imshow(
-        dod_masked, cmap=plotting.DOD_CMAP, vmin=-45.0, vmax=45.0, alpha=0.88, extent=ext, origin="upper"
+        delta_c,
+        cmap="PuOr_r",
+        vmin=-vlim,
+        vmax=vlim,
+        alpha=0.78,
+        extent=ext,
+        origin="upper",
     )
-    axes[2].set_title(
-        f"(c) DoD (red = erosion, blue = deposit)\n"
-        f"eroded {vol['eroded_volume_m3']/1e6:.2f} Mm³ | deposited {vol['deposited_volume_m3']/1e6:.2f} Mm³",
-        fontweight="bold",
-        fontsize=10,
-    )
+    axes[2].set_title("(c) Oso Δ complexity (post − pre)", fontweight="bold", fontsize=10)
     cb = fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-    cb.set_label(plotting.DOD_LABEL)
+    cb.set_label("ΔMean Complexity")
 
     for ax in axes:
         ax.set_xlabel("UTM Easting (km, Zone 10N)")
@@ -347,12 +348,13 @@ def regenerate_oso_landslide() -> Path:
         style="italic",
     )
 
-    out = IMG / "oso_landslide_dod.png"
+    out = IMG / "oso_landslide_complexity.png"
     plotting.save_figure(fig, out, max_width_px=1600, palette=True)
-    # Supersede the old Oso complexity-only board.
-    old = IMG / "oso_cwt_change.png"
-    if old.exists():
-        old.unlink()
+    # Supersede older Oso-only / DoD filenames.
+    for obsolete in ("oso_cwt_change.png", "oso_landslide_dod.png"):
+        old = IMG / obsolete
+        if old.exists():
+            old.unlink()
     return out
 
 
@@ -729,7 +731,7 @@ def main() -> None:
     outs = []
     print("=== CWT Sheep Mountain board ===")
     outs.append(regenerate_cwt_multiscale())
-    print("=== Oso landslide DoD board ===")
+    print("=== Oso landslide complexity board ===")
     outs.append(regenerate_oso_landslide())
     print("=== cross-section ===")
     outs.append(regenerate_cross_section())

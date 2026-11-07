@@ -56,8 +56,8 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 ![Multiscale CWT complexity](image/cwt_multiscale.png)
 *2D Mexican-hat CWT at Sheep Mountain: DEM, ridges/valleys, mean complexity on hillshade, two-column A–A′ energy profile, and dominant wavelength on hillshade.*
 
-![Oso landslide DoD](image/oso_landslide_dod.png)
-*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and DEM of Difference (red = erosion, blue = deposit). No co-event InSAR in the package.*
+![Oso landslide Δ complexity](image/oso_landslide_complexity.png)
+*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and Δ complexity (post − pre) over hillshade. No co-event InSAR in the package.*
 
 ![Auto-mapping validation](image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*
