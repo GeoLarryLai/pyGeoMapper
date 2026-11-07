@@ -244,16 +244,18 @@ def test_3d_renderers_and_forge3d_adapter():
         n_samples=80,
         top_stride=2,
         wall_stride=2,
-        azimuth_deg=-88.0,
-        elevation_deg=26.0,
+        azimuth_deg=-78.0,
+        elevation_deg=28.0,
     )
-    assert len(fig5.axes) >= 2
+    # Opaque block + two distinct section panels (A–A′ and B–B′), not one overlapping fence plot.
+    assert len(axes5) >= 3
+    assert len(fig5.axes) >= 3
     # Left opaque block should carry section marks (black) and a red fault trace with ticks.
     assert any(ln.get_color() in ("#111111", "k", "black") for ln in axes5[0].get_lines())
     assert any(ln.get_color() == "#d62728" for ln in axes5[0].get_lines())
-    # Both panels share the same camera.
-    assert axes5[0].azim == axes5[1].azim
-    assert axes5[0].elev == axes5[1].elev
+    # All panels share the same camera.
+    assert axes5[0].azim == axes5[1].azim == axes5[2].azim == -78.0
+    assert axes5[0].elev == axes5[1].elev == axes5[2].elev == 28.0
     plt.close(fig5)
 
 

@@ -363,9 +363,9 @@ SHEEP_SECTIONS = (
     (SHEEP_AA[0], SHEEP_AA[1], "A", "A'"),
     (SHEEP_BB[0], SHEEP_BB[1], "B", "B'"),
 )
-# Shared 3D camera: ~30° clockwise from a SE face-on view so more of the S–N block side is visible.
-SHEEP_3D_AZIMUTH_DEG = -88.0
-SHEEP_3D_ELEVATION_DEG = 26.0
+# Shared 3D camera: original "good" SE view (−58°) + 20° clockwise (not the later ~30° ugly view).
+SHEEP_3D_AZIMUTH_DEG = -78.0
+SHEEP_3D_ELEVATION_DEG = 28.0
 
 
 def _sheep_fault(dem):
@@ -454,7 +454,7 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         cutaway_fraction=(0.48, 0.48, 0.36),
     )
 
-    # Opaque solid block (A–A' + B–B' marked) | matching faulted fences; shared camera.
+    # Opaque solid block | distinct A–A′ and B–B′ 3D sections (not overlapping); shared camera.
     fig, _ = viewer_3d.plot_3d_block_and_section(
         block_f,
         start_xy,
@@ -467,14 +467,18 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         show_fault_plane=True,
         top_stride=1,
         wall_stride=1,
+        section_alpha=1.0,
+        fault_alpha=0.14,
         titles=(
             "(a) 3D geologic block with A–A′ & B–B′ section locations",
-            f"(b) Matching 3D sections A–A′ & B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
+            f"(b) Matching 3D section A–A′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
+            f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
+            f"(c) Matching 3D section B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
             f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
         ),
     )
     out1 = IMG / "3d_block_diagram.png"
-    plotting.save_figure(fig, out1, max_width_px=1350, palette=False)
+    plotting.save_figure(fig, out1, max_width_px=1600, palette=False)
     plt.close(fig)
 
     fence_panels = viewer_3d.slice_3d_fence_diagram(
