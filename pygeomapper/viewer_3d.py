@@ -168,47 +168,43 @@ def drape_categorical_units_on_hillshade(
     hillshade: GeoGrid | np.ndarray,
     unit_labels: GeoGrid | np.ndarray,
     unit_palette_rgba: np.ndarray,
-    alpha: float = 0.92,
+    alpha: float = 0.88,
     draw_contacts: bool = True,
-    shade_floor: float = 0.72,
-    shade_amp: float = 0.38,
 ) -> np.ndarray:
     """
     Drape integer geological formation IDs over a multi-azimuth hillshade and return an
     `(rows, cols, 4)` `uint8` RGBA image suitable for 3D mesh vertex coloring and WebGL textures.
 
-    Defaults favor opaque, saturated map-unit colors (high `alpha`, high `shade_floor`) so
-    surface geology stays readable on solid 3D blocks rather than looking washed/transparent.
+    High `alpha` keeps stratigraphic unit fills opaque and colorful on solid 3D blocks
+    (hillshade only gently modulates the unit colors).
     """
     hs = hillshade.data if isinstance(hillshade, GeoGrid) else np.asarray(hillshade, dtype=np.float64)
     lbl = unit_labels.data if isinstance(unit_labels, GeoGrid) else np.asarray(unit_labels)
-    lbl_i32 = np.where(np.isfinite(lbl) & (lbl >= 0), np.round(lbl).astype(np.int32), -1)
+    lbl_f = np.asarray(lbl, dtype=np.float64)
+    lbl_i32 = np.where(np.isfinite(lbl_f) & (lbl_f >= 0), np.round(lbl_f).astype(np.int32), -1)
 
     hs_clean = np.clip(np.nan_to_num(hs, nan=0.6), 0.0, 1.0)
     rows, cols = lbl_i32.shape
-    # Start from unit colors (not grey hillshade) so undraped gaps never look black.
-    out_rgb = np.full((rows, cols, 3), 0.92, dtype=np.float64)
+    # Seed with unit colors (not grey hillshade) so every labeled cell stays painted.
+    out_rgb = np.full((rows, cols, 3), 0.85, dtype=np.float64)
 
     n_pal = len(unit_palette_rgba)
     pal_f = unit_palette_rgba[:, :3].astype(np.float64) / 255.0
     a = float(np.clip(alpha, 0.0, 1.0))
-    floor = float(np.clip(shade_floor, 0.0, 1.0))
-    amp = float(np.clip(shade_amp, 0.0, 1.0))
     for uid in range(n_pal):
         m = lbl_i32 == uid
         if np.any(m):
             c_rgb = pal_f[uid]
-            shaded = np.clip(c_rgb[np.newaxis, :] * (floor + amp * hs_clean[m, np.newaxis]), 0.0, 1.0)
-            # Prefer pure unit color, then lightly modulate with hillshade.
-            solid = c_rgb[np.newaxis, :]
-            lit = 0.82 * solid + 0.18 * shaded
+            # Gentle hillshade modulation on top of solid unit color (keeps faces readable).
+            shaded = np.clip(c_rgb[np.newaxis, :] * (0.55 + 0.55 * hs_clean[m, np.newaxis]), 0.0, 1.0)
+            solid = np.broadcast_to(c_rgb[np.newaxis, :], shaded.shape)
+            lit = 0.70 * solid + 0.30 * shaded
             out_rgb[m] = (1.0 - a) * out_rgb[m] + a * lit
 
     if draw_contacts:
         contacts, _ = _core.extract_unit_contacts_rs(np.ascontiguousarray(lbl_i32, dtype=np.int32))
         c_mask = contacts > 0
-        # Darken contacts gently so unit fills stay colorful.
-        out_rgb[c_mask] = out_rgb[c_mask] * 0.55
+        out_rgb[c_mask] = out_rgb[c_mask] * 0.40
 
     rgba_u8 = np.empty((rows, cols, 4), dtype=np.uint8)
     rgba_u8[:, :, :3] = np.clip(np.round(out_rgb * 255.0), 0, 255).astype(np.uint8)
@@ -820,10 +816,11 @@ def _render_mesh_poly3d(
         edgecolors=edgecolors,
         linewidths=lw,
         antialiased=False,
+        shade=False,
     )
-    # Prefer painter's algorithm that keeps later (top) faces covering earlier walls.
+    # Average z-sort is more stable than "min" for dense block walls (avoids blank gray faces).
     try:
-        coll.set_zsort("min")
+        coll.set_zsort("average")
     except Exception:
         pass
     ax.add_collection3d(coll)
@@ -1163,22 +1160,6 @@ def plot_3d_block_diagram(
     else:
         fig = ax.figure
 
-    # 1. Render base plate (`face_group=5`) and 4 outer vertical cross-section walls (`face_group=1..4`)
-    # Opaque solid faces (no edge mesh) so the block does not look see-through. Slight brighten
-    # keeps near-side stratigraphy readable (avoids near-black MPL faces).
-    _render_mesh_poly3d(
-        ax,
-        block_model["mesh"],
-        x_origin=x_min,
-        y_origin=y_min,
-        include_face_groups=[1, 2, 3, 4, 5],
-        face_stride=wall_stride,
-        alpha=1.0,
-        edge_alpha=0.0,
-        brighten=0.10,
-    )
-
-    # 2. Opaque top topographic surface via plot_surface (avoids MPL Poly3DCollection see-through).
     xx, yy = np.meshgrid(xs - x_min, ys - y_min)
     zz = np.nan_to_num(dem.data, nan=float(np.nanmean(dem.data)))
     if surface_drape_rgba is not None:
@@ -1187,12 +1168,27 @@ def plot_3d_block_diagram(
         drape_u8 = np.ascontiguousarray(block_model["surface_drape_rgba"], dtype=np.uint8)
     if drape_u8.shape[2] == 3:
         drape_u8 = np.dstack([drape_u8, np.full(dem.shape, 255, dtype=np.uint8)])
-    stride = max(1, int(top_stride))
+    # Stride>=2 keeps matplotlib's 3D painter algorithm stable (stride=1 → blank gray faces).
+    stride = max(2, int(top_stride))
     facecolors = drape_u8[::stride, ::stride, :3].astype(np.float64) / 255.0
     # plot_surface wants (M-1, N-1, 4) facecolors for an (M, N) grid
     fc = np.concatenate(
         [facecolors[:-1, :-1, :], np.ones((*facecolors[:-1, :-1].shape[:2], 1), dtype=np.float64)],
         axis=-1,
+    )
+
+    # Base plate first, then opaque unit-colored top, then walls last so near-side beds
+    # are not swallowed by axis panes / painter-order artifacts.
+    _render_mesh_poly3d(
+        ax,
+        block_model["mesh"],
+        x_origin=x_min,
+        y_origin=y_min,
+        include_face_groups=[5],
+        face_stride=1,
+        alpha=1.0,
+        edge_alpha=0.0,
+        brighten=0.05,
     )
     ax.plot_surface(
         xx[::stride, ::stride],
@@ -1204,6 +1200,17 @@ def plot_3d_block_diagram(
         antialiased=False,
         rstride=1,
         cstride=1,
+    )
+    _render_mesh_poly3d(
+        ax,
+        block_model["mesh"],
+        x_origin=x_min,
+        y_origin=y_min,
+        include_face_groups=[1, 2, 3, 4],
+        face_stride=max(2, int(wall_stride)),
+        alpha=1.0,
+        edge_alpha=0.0,
+        brighten=0.16,
     )
 
     # Draw crisp black bounding rim around top topography and base corners
@@ -1250,6 +1257,13 @@ def plot_3d_block_diagram(
     ax.set_zlim(z_bot, z_top + 25.0)
     ax.set_box_aspect((x_range / max_xy, y_range / max_xy, max(z_range / max_xy, 0.28)))
     ax.view_init(elev=float(elevation_deg), azim=float(azimuth_deg))
+    # Hide gray axis panes that otherwise read as "empty" uncolored block faces.
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        try:
+            axis.pane.set_facecolor((1.0, 1.0, 1.0, 0.0))
+            axis.pane.set_edgecolor((0.75, 0.75, 0.75, 0.35))
+        except Exception:
+            pass
     ax.set_xlabel("Relative Easting (m)", labelpad=6)
     ax.set_ylabel("Relative Northing (m)", labelpad=6)
     ax.set_zlabel("Elevation (m NAVD88)", labelpad=6)
@@ -1412,11 +1426,11 @@ def plot_3d_fence_diagram(
             xx,
             yy,
             zz,
-            rstride=16,
-            cstride=16,
-            color="#666666",
-            linewidth=0.22,
-            alpha=0.16,
+            rstride=20,
+            cstride=20,
+            color="#777777",
+            linewidth=0.18,
+            alpha=0.10,
         )
 
     # Opaque vertical fence ribbon(s) next — solid stratigraphic colors.
@@ -1429,8 +1443,8 @@ def plot_3d_fence_diagram(
             include_face_groups=None,
             face_stride=1,
             alpha=float(np.clip(section_alpha, 0.05, 1.0)),
-            edge_alpha=0.03,
-            brighten=0.06,
+            edge_alpha=0.08,
+            brighten=0.12,
         )
         # Top topographic trace of the fence panel
         px = np.asarray(panel["x"]) - x_min
@@ -1486,6 +1500,12 @@ def plot_3d_fence_diagram(
     ax.set_zlim(z_bot, z_top + 25.0)
     ax.set_box_aspect((x_range / max_xy, y_range / max_xy, max(z_range / max_xy, 0.28)))
     ax.view_init(elev=float(elevation_deg), azim=float(azimuth_deg))
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        try:
+            axis.pane.set_facecolor((1.0, 1.0, 1.0, 0.0))
+            axis.pane.set_edgecolor((0.75, 0.75, 0.75, 0.35))
+        except Exception:
+            pass
     ax.set_xlabel("Relative Easting (m)", labelpad=6)
     ax.set_ylabel("Relative Northing (m)", labelpad=6)
     ax.set_zlabel("Elevation (m NAVD88)", labelpad=6)
@@ -1515,24 +1535,24 @@ def plot_3d_block_and_section(
     section_elevation_deg: float | None = None,
     n_samples: int = 160,
     show_fault_plane: bool = True,
-    top_stride: int = 1,
-    wall_stride: int = 1,
+    top_stride: int = 2,
+    wall_stride: int = 2,
     titles: Sequence[str] | None = None,
     section_alpha: float = 1.0,
     fault_alpha: float = 0.14,
-) -> tuple[Any, tuple[Any, ...]]:
+) -> tuple[Any, tuple[Any, Any]]:
     """
-    README-style figure: opaque solid 3D geologic block + distinct 3D cross-section panel(s).
+    README-style two-panel figure: opaque solid 3D geologic block | dual-section 3D view.
 
-    Left: opaque volumetric block with section-position traces marked (default A–A', or pass
-    `sections=` for A–A' + B–B'). Non-fault contacts are solid black; the fault is a red
+    Left (a): opaque volumetric block with section-position traces marked (default A–A', or
+    pass `sections=` for A–A' + B–B'). Non-fault contacts are solid black; the fault is a red
     surface trace with dip ticks (plane itself is inside the opaque block).
 
-    Right: one panel per section (not overlapping fences). With two sections the layout is
-    left block (full height) | (b) A–A′ stacked over (c) B–B′. Each section uses opaque
-    stratigraphic colors and a light, highly transparent red fault plane.
+    Right (b): **one** 3D axes containing all requested section fences together (both A–A′ and
+    B–B′ when provided), with opaque stratigraphic colors and a light, highly transparent red
+    fault plane — not separate stacked subplots.
 
-    All panels share one camera (`azimuth_deg` / `elevation_deg`). Default ≈ original SE
+    Both panels share one camera (`azimuth_deg` / `elevation_deg`). Default ≈ original SE
     face-on view (−58°) rotated 20° clockwise (−78°) so more of the S–N side is visible.
     """
     if sections is None:
@@ -1555,48 +1575,26 @@ def plot_3d_block_and_section(
     for fence, sec in zip(fences, sections):
         fence["name"] = f"Fence {sec[2]}-{sec[3]}"
 
-    n_sec = len(sections)
+    labels = " & ".join(f"{s[2]}–{s[3]}" for s in sections)
     if titles is None:
-        if n_sec == 1:
-            titles = (
-                f"(a) 3D geologic block with {sections[0][2]}–{sections[0][3]} section location",
-                f"(b) Matching 3D section {sections[0][2]}–{sections[0][3]} "
-                "(published ~50° SW thrust; tip/throw inferred)",
-            )
-        else:
-            titles = [
-                "(a) 3D geologic block with "
-                + " & ".join(f"{s[2]}–{s[3]}" for s in sections)
-                + " section locations",
-            ]
-            for i, sec in enumerate(sections):
-                letter = chr(ord("b") + i)
-                titles.append(
-                    f"({letter}) Matching 3D section {sec[2]}–{sec[3]} "
-                    "(published ~50° SW thrust; tip/throw inferred)"
-                )
+        titles = (
+            f"(a) 3D geologic block with {labels} section locations",
+            f"(b) Matching 3D sections {labels} (published ~50° SW thrust; tip/throw inferred)",
+        )
     titles = list(titles)
 
-    if n_sec >= 2:
-        # Left opaque block | right stacked distinct sections (never overlapping fences).
-        fig = plt.figure(figsize=(15.2, 8.4), layout="constrained")
-        gs = fig.add_gridspec(n_sec, 2, width_ratios=[1.18, 1.0], height_ratios=[1.0] * n_sec)
-        ax0 = fig.add_subplot(gs[:, 0], projection="3d")
-        section_axes = [
-            fig.add_subplot(gs[i, 1], projection="3d") for i in range(n_sec)
-        ]
-    else:
-        fig = plt.figure(figsize=(14.5, 6.6), layout="constrained")
-        ax0 = fig.add_subplot(121, projection="3d")
-        section_axes = [fig.add_subplot(122, projection="3d")]
+    # Exactly two panels: left solid block | right one box with all section fences.
+    fig = plt.figure(figsize=(14.8, 6.8), layout="constrained")
+    ax0 = fig.add_subplot(121, projection="3d")
+    ax1 = fig.add_subplot(122, projection="3d")
 
     plot_3d_block_diagram(
         block_model,
         vertical_exaggeration=vertical_exaggeration,
         azimuth_deg=az,
         elevation_deg=el,
-        top_stride=top_stride,
-        wall_stride=wall_stride,
+        top_stride=max(2, int(top_stride)),
+        wall_stride=max(2, int(wall_stride)),
         show_fault_plane=show_fault_plane,
         show_surface_contacts=True,
         show_attitudes=False,
@@ -1605,26 +1603,23 @@ def plot_3d_block_and_section(
         title=titles[0],
         section_xy=list(sections),
     )
-
-    for i, (ax_s, fence) in enumerate(zip(section_axes, fences)):
-        title_i = titles[i + 1] if i + 1 < len(titles) else fence["name"]
-        plot_3d_fence_diagram(
-            block_model,
-            fence_panels=[fence],
-            vertical_exaggeration=vertical_exaggeration,
-            azimuth_deg=az,
-            elevation_deg=el,
-            show_fault_plane=show_fault_plane,
-            show_wireframe_surface=True,
-            show_legend=(i == 0),
-            ax=ax_s,
-            title=title_i,
-            section_alpha=section_alpha,
-            fault_alpha=fault_alpha,
-            fault_face_stride=4,
-        )
-
-    return fig, (ax0, *section_axes)
+    plot_3d_fence_diagram(
+        block_model,
+        fence_panels=fences,
+        vertical_exaggeration=vertical_exaggeration,
+        azimuth_deg=az,
+        elevation_deg=el,
+        show_fault_plane=show_fault_plane,
+        # No topo wireframe: with two opaque fences it only ghosts through MPL faces.
+        show_wireframe_surface=False,
+        show_legend=True,
+        ax=ax1,
+        title=titles[1] if len(titles) > 1 else f"(b) Matching 3D sections {labels}",
+        section_alpha=section_alpha,
+        fault_alpha=fault_alpha,
+        fault_face_stride=5,
+    )
+    return fig, (ax0, ax1)
 
 
 # Backward-compatible alias (older notebooks/tests). Prefer `plot_3d_block_and_section`.

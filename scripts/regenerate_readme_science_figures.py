@@ -456,7 +456,7 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         cutaway_fraction=(0.48, 0.48, 0.36),
     )
 
-    # Opaque solid block | distinct A–A′ and B–B′ 3D sections (not overlapping); shared camera.
+    # Opaque solid block | one right-hand box with both A–A′ & B–B′ fences; shared camera.
     fig, _ = viewer_3d.plot_3d_block_and_section(
         block_f,
         start_xy,
@@ -467,20 +467,18 @@ def regenerate_3d_block() -> tuple[Path, Path]:
         elevation_deg=SHEEP_3D_ELEVATION_DEG,
         n_samples=160,
         show_fault_plane=True,
-        top_stride=1,
-        wall_stride=1,
+        top_stride=2,
+        wall_stride=2,
         section_alpha=1.0,
-        fault_alpha=0.14,
+        fault_alpha=0.10,
         titles=(
             "(a) 3D geologic block with A–A′ & B–B′ section locations",
-            f"(b) Matching 3D section A–A′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
-            f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
-            f"(c) Matching 3D section B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
+            f"(b) Matching 3D sections A–A′ & B–B′ + SW-dipping ~{fault_spec['dip_deg']:.0f}° basement thrust "
             f"(throw +{fault_spec['throw_m']:.0f} m inferred)",
         ),
     )
     out1 = IMG / "3d_block_diagram.png"
-    plotting.save_figure(fig, out1, max_width_px=1600, palette=False)
+    plotting.save_figure(fig, out1, max_width_px=1500, palette=False)
     plt.close(fig)
 
     fence_panels = viewer_3d.slice_3d_fence_diagram(
