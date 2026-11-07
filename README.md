@@ -12,6 +12,17 @@
 
 **pyGeoMapper** maps what changed on the ground, and what it's made of, using satellite images and elevation models (DEMs). I wanted one place to go from raw rasters to something a geologist can actually read: change maps after a landslide, flood, wildfire, earthquake, volcano or glacier event, unit maps scored against a real geologic map, and cross-sections and 3D block diagrams you can open in a browser. It's Python with a Rust core. (Not related to `The-Magicians-Code/PyGeoMapper`.)
 
+## Data types
+
+pyGeoMapper can read, analyze, and visualize:
+
+- **Elevation:** DEMs and lidar (Copernicus GLO-30, USGS 3DEP lidar); terrain derivatives, CWT complexity, DEM of Difference
+- **Optical imagery:** multispectral Sentinel-2 and Landsat, NAIP aerial RGB; spectral indices (NDVI, NBR, NDWI, BSI, clay and iron ratios) and their change; optical feature-tracking velocity
+- **Satellite embeddings:** 64-band Google AlphaEarth annual embeddings for classification and embedding change
+- **InSAR:** Sentinel-1 LiCSAR displacement, offsets, and wrapped phase; UAVSAR unwrapped phase to LOS; Okada fault models
+- **Ice velocity:** NASA ITS_LIVE velocity grids and speed change
+- **Geology:** geologic map polygons as training and validation labels, bed attitudes (strike/dip), and fault traces for cross-sections and 3D block models
+
 ## Installation
 
 ```bash
@@ -49,10 +60,10 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 This part covers automated geologic mapping with supervised machine learning. Models are trained from geomorphic surface features and surface-geology constraints, then the mapped units are reconstructed as cross-sections and a 3D structural model.
 
 ![Multiscale CWT complexity](image/cwt_multiscale.png)
-*Sheep Mountain, Wyoming: 2D Mexican-hat CWT — DEM, ridges and valleys, mean complexity, A–A′ energy profile, and dominant wavelength.*
+*Sheep Mountain, Wyoming — **DEM** + 2D Mexican-hat **continuous wavelet transform** ([pyTopocomplexity](https://github.com/GeoLarryLai/pyTopocomplexity)): ridges and valleys, mean complexity, A–A′ energy profile, and dominant wavelength.*
 
 ![Automatic geologic mapping at Sheep Mountain](image/auto_mapping_validation.png)
-*Automatic geologic mapping at Sheep Mountain, Wyoming, from 64-band AlphaEarth embeddings. USGS map units in the northwest half trained the model; the southeast half was held out (validation accuracy 91.0%, macro-F1 0.89).*
+*Sheep Mountain, Wyoming — **64-band AlphaEarth embeddings** + **supervised ML**, trained on USGS geologic map units in the northwest half and validated on the held-out southeast half (accuracy 91.0%, macro-F1 0.89).*
 
 | Method | Bands | Validation accuracy | Macro-F1 |
 | :--- | ---: | ---: | ---: |
@@ -61,35 +72,32 @@ This part covers automated geologic mapping with supervised machine learning. Mo
 | Combined | 93 | 89.5% | 0.87 |
 
 ![Cross-section](image/cross_section.png)
-*Sheep Mountain, Wyoming: A–A′ and B–B′ (~60° apart) from 3-point bed attitudes, with the published SW-dipping ~50° basement thrust.*
+*Sheep Mountain, Wyoming — **mapped units + 3-point bed attitudes** projected to A–A′ and B–B′ (~60° apart), with the published SW-dipping ~50° basement thrust.*
 
 ![Rotating Sheep Mountain block and sections](image/3d_block_diagram_rotate.gif)
-*Sheep Mountain, Wyoming: an opaque geologic block and the matching faulted A–A′ and B–B′ sections rotate together, 72 frames at 3 fps (about 24 seconds per turn).*
+*Sheep Mountain, Wyoming — **reconstructed 3D geologic block** with matching faulted A–A′ and B–B′ sections; 72 frames at 3 fps (about 24 seconds per turn).*
 
 ## Surface change
 
 This part is a set of toolkits for detecting surface change at different temporal and spatial scales, using a range of remote-sensing data types and methods.
 
-![DEM of Difference and spectral change](image/dod_and_spectral_change.png)
-*2014 Oso landslide, Washington: DEM of Difference (red = erosion, blue = deposit) and spectral change, the two basic ways the package spots change on the ground.*
-
-![Oso landslide Δ complexity](image/oso_landslide_complexity.png)
-*2014 Oso landslide, Washington: pre DEM and 2013 NAIP, post DEM and 2017 Sentinel-2, and the change in terrain complexity.*
+![2014 Oso landslide, Washington](image/oso_landslide.png)
+*2014 Oso landslide, Washington — **DEMs** (pre COP30, post 3DEP lidar) → DEM of Difference (red = erosion, blue = deposit); **Sentinel-2** spectral change (ΔNDVI, ΔNBR); and terrain Δ complexity via CWT ([pyTopocomplexity](https://github.com/GeoLarryLai/pyTopocomplexity)).*
 
 ![Holiday Farm Fire, Oregon](image/holiday_farm_fire.png)
-*2020 Holiday Farm Fire, Oregon: Sentinel-2 SWIR–NIR–red composites before and after the fire, and the burn-ratio change (ΔNBR). The cyan outline marks higher debris-flow hazard.*
+*2020 Holiday Farm Fire, Oregon — **Sentinel-2** SWIR–NIR–red composites before and after, and **burn-ratio change (ΔNBR)**; cyan outline marks higher debris-flow hazard.*
 
 ![Yolo Bypass Flood, California](image/yolo_bypass_flood.png)
-*2019 Yolo Bypass flood, California: Sentinel-2 before and during the flood, and the water-index change (ΔNDWI). The cyan outline is the mapped shoreline.*
+*2019 Yolo Bypass flood, California — **Sentinel-2** before and during the flood, and **water-index change (ΔNDWI)**; cyan outline is the mapped shoreline.*
 
 ![Myanmar 2025 earthquake LiCSAR](image/case1a_myanmar_earthquake.jpg)
-*2025 Mw 7.7 earthquake on the Sagaing Fault, Myanmar: Sentinel-1 LiCSAR north–south displacement, azimuth and range offsets, and wrapped phase.*
+*2025 Mw 7.7 Sagaing Fault earthquake, Myanmar — **Sentinel-1 LiCSAR InSAR**: north–south displacement, azimuth and range offsets, and wrapped phase.*
 
 ![Slumgullion Earthflow, Colorado](image/slumgullion_earthflow.png)
-*Slumgullion Earthflow, Colorado: NAIP optical velocity (2017–2023), package-computed UAVSAR LOS and rewrapped phase (12–19 August 2011), and 2024−2015 elevation change (red = lowering, blue = raising). Arrows are optical motion only.*
+*Slumgullion Earthflow, Colorado — **NAIP optical feature tracking** (velocity 2017–2023), **UAVSAR** LOS and rewrapped phase (12–19 August 2011), and **DEM difference** 2024−2015 (red = lowering, blue = raising). Arrows are optical motion only.*
 
 ![Jakobshavn ITS_LIVE glacier velocity](image/case1d_jakobshavn_glacier.jpg)
-*Jakobshavn Isbræ, West Greenland: NASA ITS_LIVE surface velocity in 2018 with flow directions, and the 2018−2016 change in speed.*
+*Jakobshavn Isbræ, West Greenland — **NASA ITS_LIVE velocity**: 2018 surface speed with flow directions, and 2018−2016 speed change.*
 
 Five notebooks in `notebooks/` walk through every module with public data (spectral and surface change,
 terrain complexity, auto-mapping and cross-sections, 3D, and a multi-hazard showcase).

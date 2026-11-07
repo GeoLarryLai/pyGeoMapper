@@ -394,6 +394,69 @@ def regenerate_oso_landslide() -> Path:
     return out
 
 
+def regenerate_oso_2x2() -> Path:
+    """README Oso figure: DoD, ΔNDVI, ΔNBR, and Δ terrain complexity as one tight 2×2.
+
+    Same inputs and color conventions as Notebook 1 (DoD, spectral change) and the
+    Δ complexity panel (PuOr_r, scales 15–120 m).
+    """
+    from pygeomapper import spectral_indices, surface_change, viewer_3d
+
+    dem_pre = raster_io.load_geotiff(DATA / "oso_dem_pre_cop30.tif", units="m")
+    dem_post = raster_io.load_geotiff(DATA / "oso_dem_post_3dep.tif", units="m")
+    s2_2017 = raster_io.load_multiband_geotiff(DATA / "oso_s2_20170826.tif", units="reflectance")
+    s2_2024 = raster_io.load_multiband_geotiff(DATA / "oso_s2_20240906.tif", units="reflectance")
+    hs_post = terrain_analysis.compute_hillshade(dem_post, multi_azimuth=True)
+
+    raw = surface_change.compute_dod(dem_pre, dem_post)
+    stable = (np.abs(raw["raw_dod"].data) < 4.0).astype(np.uint8)
+    dod = surface_change.compute_dod(dem_pre, dem_post, detrend_stable_mask=stable)["dod"]
+    i17 = spectral_indices.compute_index_suite(s2_2017)
+    i24 = spectral_indices.compute_index_suite(s2_2024)
+    dndvi = surface_change.compute_index_change(i17["NDVI"], i24["NDVI"], convention="t2_minus_t1")
+    dnbr = surface_change.compute_index_change(i17["NBR"], i24["NBR"], convention="t1_minus_t2")
+    comp = terrain_analysis.compare_complexity_change(
+        dem_pre, dem_post, scales_m=[15.0, 30.0, 60.0, 120.0]
+    )
+    delta_c = np.asarray(comp["delta_complexity"].data, dtype=np.float64)
+    vlim = max(float(np.nanpercentile(np.abs(delta_c), 98)), 1.0)
+    ext = dem_post.extent
+
+    fig, axes = plt.subplots(2, 2, figsize=(10.4, 8.7), sharex=True, sharey=True)
+    fig.subplots_adjust(left=0.07, right=0.93, top=0.95, bottom=0.06, wspace=0.28, hspace=0.12)
+    a, b, c, d = axes.ravel()
+
+    a.imshow(viewer_3d.drape_overlay_on_hillshade(
+        hs_post, dod, cmap=plotting.DOD_CMAP, vmin=-45, vmax=45, alpha=0.75), extent=ext)
+    a.set_title("(a) DEM of Difference (red = erosion, blue = deposit)", fontweight="bold", fontsize=10)
+    fig.colorbar(plotting.colorbar_mappable(plotting.DOD_CMAP, vmin=-45, vmax=45),
+                 ax=a, fraction=0.046, pad=0.02, label="Δz (m)")
+
+    im = b.imshow(dndvi.data, cmap="PiYG", vmin=-0.55, vmax=0.55, extent=ext)
+    b.set_title("(b) ΔNDVI 2024 − 2017 (green = regrowth)", fontweight="bold", fontsize=10)
+    fig.colorbar(im, ax=b, fraction=0.046, pad=0.02, label="ΔNDVI")
+
+    im = c.imshow(dnbr.data, cmap="RdYlBu_r", vmin=-0.55, vmax=0.55, extent=ext)
+    c.set_title("(c) ΔNBR 2017 − 2024 (red = canopy loss)", fontweight="bold", fontsize=10)
+    fig.colorbar(im, ax=c, fraction=0.046, pad=0.02, label="ΔNBR")
+
+    d.imshow(hs_post.data, cmap="gray", extent=ext)
+    im = d.imshow(delta_c, cmap="PuOr_r", vmin=-vlim, vmax=vlim, alpha=0.78, extent=ext)
+    d.set_title("(d) Δ terrain complexity (post − pre, CWT)", fontweight="bold", fontsize=10)
+    fig.colorbar(im, ax=d, fraction=0.046, pad=0.02, label="ΔMean complexity")
+
+    for ax in axes.ravel():
+        plotting.use_plain_axes(ax, unit="km", xlabel="", ylabel="")
+    for ax in axes[1, :]:
+        ax.set_xlabel("Easting (km)")
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Northing (km)")
+
+    out = IMG / "oso_landslide.png"
+    plotting.save_figure(fig, out, max_width_px=1500)
+    return out
+
+
 # A–A' (SW–NE across the anticline) and B–B' (~60° different, nearly N–S across the fold).
 SHEEP_AA = ((726900.0, 4942800.0), (729700.0, 4944600.0))
 SHEEP_BB = ((728390.0, 4941805.0), (728250.0, 4944795.0))
@@ -770,9 +833,12 @@ def main() -> None:
         "--approved-dir", type=Path,
         help="Copy the four reviewed boards from this directory instead of rendering.",
     )
+    parser.add_argument("--oso", action="store_true", help="Only render the Oso 2×2 README figure.")
     args = parser.parse_args()
     t0 = time.perf_counter()
-    if args.approved_dir is not None:
+    if args.oso:
+        outs = [regenerate_oso_2x2()]
+    elif args.approved_dir is not None:
         outs = copy_approved_assets(args.approved_dir)
     else:
         print("=== CWT Sheep Mountain board ===")

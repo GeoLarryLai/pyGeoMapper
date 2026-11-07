@@ -22,6 +22,7 @@ README_ASSET_BUDGETS = {
     "image/3d_block_diagram_rotate.gif": 16_000_000,
     "image/holiday_farm_fire.png": 1_600_000,
     "image/yolo_bypass_flood.png": 1_300_000,
+    "image/oso_landslide.png": 1_500_000,
 }
 RAW_PREFIX = "https://raw.githubusercontent.com/GeoLarryLai/pyGeoMapper/main/"
 TEXT_SUFFIXES = {".py", ".rs", ".md", ".ipynb", ".toml", ".yml", ".yaml", ".cff", ".txt", ".json"}
@@ -76,7 +77,7 @@ def test_readme_gallery_uses_restored_science_figures() -> None:
     for required in (
         "image/case1a_myanmar_earthquake.jpg",
         "image/cwt_multiscale.png",
-        "image/oso_landslide_complexity.png",
+        "image/oso_landslide.png",
         "image/3d_block_diagram_rotate.gif",
         "image/case1d_jakobshavn_glacier.jpg",
         "image/slumgullion_earthflow.png",
@@ -90,6 +91,11 @@ def test_readme_gallery_uses_restored_science_figures() -> None:
     assert "image/myanmar_insar_3d.jpg" not in text
     assert "image/oso_cwt_change.png" not in text
     assert "image/oso_landslide_dod.png" not in text
+    assert "image/dod_and_spectral_change.png" not in text
+    assert "image/oso_landslide_complexity.png" not in text
+    assert text.count("image/oso_landslide") == 1
+    assert "github.com/GeoLarryLai/pyTopocomplexity" in text
+    assert (REPO_ROOT / "image" / "oso_landslide.png").is_file()
     assert "SW-dipping" in text or "basement thrust" in text
     assert "NE-dipping forelimb reverse fault" not in text
     assert "Δ complexity" in text or "delta complexity" in text.lower()
@@ -156,8 +162,7 @@ def test_readme_gallery_order_and_settled_stories() -> None:
         "image/auto_mapping_validation.png",
         "image/cross_section.png",
         "image/3d_block_diagram_rotate.gif",
-        "image/dod_and_spectral_change.png",
-        "image/oso_landslide_complexity.png",
+        "image/oso_landslide.png",
         "image/holiday_farm_fire.png",
         "image/yolo_bypass_flood.png",
         "image/case1a_myanmar_earthquake.jpg",
