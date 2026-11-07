@@ -27,6 +27,14 @@ Study Area:
    - Bands included (6): `blue` (B02), `green` (B03), `red` (B04), `nir` (B08), `swir1` (B11), `swir2` (B12)
    - License: Copernicus Sentinel Data Legal Notice (Free, full, and open access; European Commission / ESA)
 
+3b. `oso_naip_20130910.tif` (Pre-slide USDA NAIP true-color orthophoto, clipped to the Oso example grid)
+   - Source: USDA Farm Service Agency National Agriculture Imagery Program (NAIP) via Microsoft Planetary
+     Computer STAC (`https://planetarycomputer.microsoft.com/dataset/naip`), item
+     `wa_m_4812142_sw_10_1_20130910_20131022` (acquired 2013-09-10, ~1 m native).
+   - Resampled/clipped onto the same `EPSG:32610` 200×200 (~11.26 m) grid as `oso_dem_pre_cop30.tif`
+     for README figure drapes (pre-landslide optical context).
+   - License: U.S. Public Domain (USDA NAIP)
+
 4. `oso_alphaearth_2017.tif` & `oso_alphaearth_2024.tif` (64-Band Unit-Sphere Embedding Pair, `A00..A63`)
    - Convention: Follows Google DeepMind AlphaEarth Foundations (`GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL`,
      Brown et al., 2025, CC-BY-4.0) 64-band (`A00..A63`) quantized `int8` (`[-127, 127]`, nodata `-128`)

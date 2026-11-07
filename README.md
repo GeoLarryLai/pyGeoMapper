@@ -54,7 +54,10 @@ Methods: [Horn (1981)](https://doi.org/10.1109/PROC.1981.11918),
 *2025 Mw 7.7 Myanmar (Sagaing): real Sentinel-1 COMET LiCSAR — N–S displacement with arrows, azimuth and range offsets, and wrapped phase on GLO-30 hillshade (tracks 106D / 070A).*
 
 ![Multiscale CWT complexity](image/cwt_multiscale.png)
-*2D Mexican-hat CWT at Sheep Mountain (DEM, ridges/valleys, multiscale complexity, dominant wavelength, A–A′ energy profile) plus Oso Δcomplexity.*
+*2D Mexican-hat CWT at Sheep Mountain: DEM, ridges/valleys, mean complexity on hillshade, two-column A–A′ energy profile, and dominant wavelength on hillshade.*
+
+![Oso landslide DoD](image/oso_landslide_dod.png)
+*2014 Oso landslide: pre DEM + 2013 NAIP, post DEM + 2017 Sentinel-2, and DEM of Difference (red = erosion, blue = deposit). No co-event InSAR in the package.*
 
 ![Auto-mapping validation](image/auto_mapping_validation.png)
 *Units auto-mapped at Sheep Mountain Anticline compared with the USGS map and scored on a held-out block.*

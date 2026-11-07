@@ -259,13 +259,14 @@ def test_notebooks_2_and_3_executed_cleanly() -> None:
                     assert out.get("output_type") != "error", f"{nb_name} cell {idx} had error"
 
     for fig_name in (
-        "oso_cwt_change.png",
+        "oso_landslide_dod.png",
         "cwt_multiscale.png",
         "auto_mapping_validation.png",
         "cross_section.png",
     ):
         p_img = REPO_ROOT / "image" / fig_name
         assert p_img.exists() and p_img.stat().st_size > 20_000
+    assert not (REPO_ROOT / "image" / "oso_cwt_change.png").exists()
 
 
 

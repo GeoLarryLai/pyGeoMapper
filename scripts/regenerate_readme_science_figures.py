@@ -43,21 +43,68 @@ def _copy_artifact(path: Path) -> None:
     print(f"artifact: {dest} ({dest.stat().st_size / 1e3:.0f} KB)")
 
 
+def _rgba_overlay_from_values(
+    values: np.ndarray,
+    cmap_name: str,
+    vmin: float,
+    vmax: float,
+    *,
+    zero_is_white: bool = False,
+) -> np.ndarray:
+    """Build an RGBA overlay; optionally map near-zero values to white / near-transparent."""
+    data = np.asarray(values, dtype=np.float64)
+    cmap = plt.get_cmap(cmap_name)
+    span = max(float(vmax - vmin), 1e-9)
+    normed = np.clip((data - vmin) / span, 0.0, 1.0)
+    rgba = cmap(normed)
+    if zero_is_white:
+        # 0 → white & near-transparent; higher values denser (alpha rises with magnitude).
+        alpha = np.clip(normed, 0.0, 1.0) ** 0.85
+        rgba[..., 0] = (1.0 - alpha) * 1.0 + alpha * rgba[..., 0]
+        rgba[..., 1] = (1.0 - alpha) * 1.0 + alpha * rgba[..., 1]
+        rgba[..., 2] = (1.0 - alpha) * 1.0 + alpha * rgba[..., 2]
+        rgba[..., 3] = 0.02 + 0.78 * alpha
+    else:
+        rgba[..., 3] = 0.65
+    rgba[~np.isfinite(data)] = (0.0, 0.0, 0.0, 0.0)
+    return rgba
+
+
+def _make_s2_rgb(stack, p_lo: float = 2.0, p_hi: float = 98.0) -> np.ndarray:
+    rgb = np.stack(
+        [stack.band("red").data, stack.band("green").data, stack.band("blue").data],
+        axis=-1,
+    ).astype(np.float64)
+    out = np.zeros_like(rgb)
+    for i in range(3):
+        band = rgb[:, :, i]
+        lo, hi = np.nanpercentile(band[np.isfinite(band)], [p_lo, p_hi])
+        out[:, :, i] = np.clip((band - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+    return out
+
+
 def regenerate_cwt_multiscale() -> Path:
+    """Sheep Mountain–only CWT board (Oso moved to its own README figure).
+
+    Layout (5 panels):
+      Top:    (a) DEM+hillshade | (b) CWT ridges/valleys | (c) mean complexity on hillshade
+      Bottom: (d) A–A' profile spanning two columns (width of a+b) | (e) λ_dom on hillshade
+    """
     sheep_dem = raster_io.load_geotiff(DATA / "sheep_mtn_dem_3dep.tif")
-    oso_pre = raster_io.load_geotiff(DATA / "oso_dem_pre_cop30.tif")
-    oso_post = raster_io.load_geotiff(DATA / "oso_dem_post_3dep.tif")
     sheep_hs = terrain_analysis.compute_hillshade(sheep_dem)
     sheep_cwt = terrain_analysis.compute_multiscale_complexity(
         sheep_dem, scales_m=[30.0, 60.0, 120.0, 220.0]
     )
-    oso_comp = terrain_analysis.compare_complexity_change(
-        oso_pre, oso_post, scales_m=[15.0, 30.0, 60.0, 120.0]
-    )
-    delta_c = oso_comp["delta_complexity"].data
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 10.6), layout="constrained")
-    fig.set_constrained_layout_pads(w_pad=0.04, h_pad=0.06, hspace=0.08, wspace=0.06)
+    fig = plt.figure(figsize=(16.0, 10.2), layout="constrained")
+    fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.05, hspace=0.08, wspace=0.05)
+    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0])
+    ax_a = fig.add_subplot(gs[0, 0])
+    ax_b = fig.add_subplot(gs[0, 1])
+    ax_c = fig.add_subplot(gs[0, 2])
+    ax_prof = fig.add_subplot(gs[1, 0:2])
+    ax_lam = fig.add_subplot(gs[1, 2])
+
     ext_s = [
         sheep_dem.bounds[0] / 1e3,
         sheep_dem.bounds[2] / 1e3,
@@ -66,62 +113,45 @@ def regenerate_cwt_multiscale() -> Path:
     ]
     p_start, p_end = (726900.0, 4942800.0), (729700.0, 4944600.0)
 
-    ax = axes[0, 0]
-    ax.imshow(sheep_hs.data, cmap="gray", extent=ext_s, origin="upper")
-    im0 = ax.imshow(sheep_dem.data, cmap="terrain", alpha=0.58, extent=ext_s, origin="upper")
-    ax.plot(
+    # (a) DEM + hillshade
+    ax_a.imshow(sheep_hs.data, cmap="gray", extent=ext_s, origin="upper")
+    im0 = ax_a.imshow(sheep_dem.data, cmap="terrain", alpha=0.58, extent=ext_s, origin="upper")
+    ax_a.plot(
         [p_start[0] / 1e3, p_end[0] / 1e3],
         [p_start[1] / 1e3, p_end[1] / 1e3],
         "r--",
         lw=2.0,
         label="Swath A–A'",
     )
-    ax.set_title("(a) Sheep Mountain DEM + hillshade", fontweight="bold", pad=8)
-    ax.set_xlabel("UTM Easting (km, Zone 12N)")
-    ax.set_ylabel("UTM Northing (km)")
-    ax.legend(loc="lower right", fontsize=8)
-    plt.colorbar(im0, ax=ax, fraction=0.046, pad=0.04, label="Elevation (m)")
+    ax_a.set_title("(a) Sheep Mountain DEM + hillshade", fontweight="bold", pad=8)
+    ax_a.set_xlabel("UTM Easting (km, Zone 12N)")
+    ax_a.set_ylabel("UTM Northing (km)")
+    ax_a.legend(loc="lower right", fontsize=8)
+    fig.colorbar(im0, ax=ax_a, fraction=0.046, pad=0.04, label="Elevation (m)")
 
-    ax = axes[0, 1]
+    # (b) CWT ridges / valleys (kept as a map panel — not turned into the overlay slot)
     cwt_30 = sheep_cwt["cwt_stack"].band("cwt_30m").data
     vmax_w = float(np.nanpercentile(np.abs(cwt_30), 98))
-    im1 = ax.imshow(cwt_30, cmap="RdBu_r", vmin=-vmax_w, vmax=vmax_w, extent=ext_s, origin="upper")
-    ax.set_title("(b) CWT response W (s = 30 m): ridges + / valleys −", fontweight="bold", pad=8)
-    ax.set_xlabel("UTM Easting (km, Zone 12N)")
-    ax.set_ylabel("UTM Northing (km)")
-    plt.colorbar(im1, ax=ax, fraction=0.046, pad=0.04, label="Wavelet Amplitude (m)")
+    im1 = ax_b.imshow(cwt_30, cmap="RdBu_r", vmin=-vmax_w, vmax=vmax_w, extent=ext_s, origin="upper")
+    ax_b.set_title("(b) CWT response W (s = 30 m): ridges + / valleys −", fontweight="bold", pad=8)
+    ax_b.set_xlabel("UTM Easting (km, Zone 12N)")
+    ax_b.set_ylabel("UTM Northing (km)")
+    fig.colorbar(im1, ax=ax_b, fraction=0.046, pad=0.04, label="Wavelet Amplitude (m)")
 
-    ax = axes[0, 2]
-    im2 = ax.imshow(sheep_cwt["mean_complexity"].data, cmap="magma", extent=ext_s, origin="upper")
-    ax.set_title("(c) Mean complexity (s = 30–220 m)", fontweight="bold", pad=8)
-    ax.set_xlabel("UTM Easting (km, Zone 12N)")
-    ax.set_ylabel("UTM Northing (km)")
-    plt.colorbar(im2, ax=ax, fraction=0.046, pad=0.04, label="Mean |W(s)| / s")
+    # (c) Mean complexity as hillshade overlay; 0 → white / near-transparent
+    comp = np.asarray(sheep_cwt["mean_complexity"].data, dtype=np.float64)
+    vmax_c = float(np.nanpercentile(comp, 98))
+    ax_c.imshow(sheep_hs.data, cmap="gray", extent=ext_s, origin="upper")
+    rgba_c = _rgba_overlay_from_values(comp, "magma", 0.0, vmax_c, zero_is_white=True)
+    ax_c.imshow(rgba_c, extent=ext_s, origin="upper")
+    sm_c = plt.cm.ScalarMappable(cmap="magma", norm=plt.Normalize(0.0, vmax_c))
+    sm_c.set_array([])
+    fig.colorbar(sm_c, ax=ax_c, fraction=0.046, pad=0.04, label="Mean |W(s)| / s")
+    ax_c.set_title("(c) Mean complexity on hillshade (s = 30–220 m)", fontweight="bold", pad=8)
+    ax_c.set_xlabel("UTM Easting (km, Zone 12N)")
+    ax_c.set_ylabel("UTM Northing (km)")
 
-    ax = axes[1, 0]
-    im3 = ax.imshow(sheep_cwt["dominant_wavelength_m"].data, cmap="viridis", extent=ext_s, origin="upper")
-    ax.set_title("(d) Dominant wavelength λ_dom", fontweight="bold", pad=8)
-    ax.set_xlabel("UTM Easting (km, Zone 12N)")
-    ax.set_ylabel("UTM Northing (km)")
-    plt.colorbar(im3, ax=ax, fraction=0.046, pad=0.04, label="Wavelength λ (m)")
-
-    ax = axes[1, 1]
-    ext_o = [
-        oso_post.bounds[0] / 1e3,
-        oso_post.bounds[2] / 1e3,
-        oso_post.bounds[1] / 1e3,
-        oso_post.bounds[3] / 1e3,
-    ]
-    oso_hs = terrain_analysis.compute_hillshade(oso_post)
-    ax.imshow(oso_hs.data, cmap="gray", extent=ext_o, origin="upper")
-    vlim_o = float(np.nanpercentile(np.abs(delta_c), 98))
-    im4 = ax.imshow(delta_c, cmap="PuOr_r", vmin=-vlim_o, vmax=vlim_o, alpha=0.78, extent=ext_o, origin="upper")
-    ax.set_title("(e) Oso Δ complexity (post − pre)", fontweight="bold", pad=8)
-    ax.set_xlabel("UTM Easting (km, Zone 10N)")
-    ax.set_ylabel("UTM Northing (km)")
-    plt.colorbar(im4, ax=ax, fraction=0.046, pad=0.04, label="ΔMean Complexity")
-
-    ax = axes[1, 2]
+    # (d) Swath A–A' profile — two columns wide (a+b), same row height as λ_dom map
     mprof = cross_section.extract_multilayer_profile(
         {
             "Elevation": sheep_dem,
@@ -134,19 +164,21 @@ def regenerate_cwt_multiscale() -> Path:
         swath_width_m=120.0,
     )
     d_m = mprof["distance_m"]
-    ax.plot(d_m, mprof["layers"]["Elevation"]["mean"], "k-", lw=2.0, label="Elevation (m)")
-    ax.fill_between(
+    ax_prof.plot(d_m, mprof["layers"]["Elevation"]["mean"], "k-", lw=2.0, label="Elevation (m)")
+    ax_prof.fill_between(
         d_m,
         mprof["layers"]["Elevation"]["min"],
         mprof["layers"]["Elevation"]["max"],
         color="gray",
         alpha=0.22,
     )
-    ax.set_xlabel("Distance Along Profile A–A' (m)")
-    ax.set_ylabel("Elevation (m NAVD88)", color="k")
-    ax2 = ax.twinx()
-    ax2.plot(d_m, mprof["layers"]["Energy_30m"]["mean"], color="#d95f02", lw=1.6, label="CWT Energy (s=30 m)")
-    ax2.plot(
+    ax_prof.set_xlabel("Distance Along Profile A–A' (m)")
+    ax_prof.set_ylabel("Elevation (m NAVD88)", color="k")
+    ax_prof2 = ax_prof.twinx()
+    ax_prof2.plot(
+        d_m, mprof["layers"]["Energy_30m"]["mean"], color="#d95f02", lw=1.6, label="CWT Energy (s=30 m)"
+    )
+    ax_prof2.plot(
         d_m,
         mprof["layers"]["Energy_120m"]["mean"],
         color="#7570b3",
@@ -154,23 +186,149 @@ def regenerate_cwt_multiscale() -> Path:
         ls="--",
         label="CWT Energy (s=120 m)",
     )
-    ax2.set_ylabel("Wavelet Energy |W(s)|/s", color="#7570b3")
-    ax.set_title("(f) Swath A–A': elevation vs. CWT energy", fontweight="bold", pad=8)
-    ax.grid(True, ls=":", alpha=0.45)
-    lines1, labels1 = ax.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax2.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7.5)
-    for a in axes.ravel()[:5]:
+    ax_prof2.set_ylabel("Wavelet Energy |W(s)|/s", color="#7570b3")
+    ax_prof.set_title("(d) Swath A–A': elevation vs. CWT energy", fontweight="bold", pad=8)
+    ax_prof.grid(True, ls=":", alpha=0.45)
+    lines1, labels1 = ax_prof.get_legend_handles_labels()
+    lines2, labels2 = ax_prof2.get_legend_handles_labels()
+    ax_prof2.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7.5)
+
+    # (e) Dominant wavelength on DEM hillshade (old d → old f slot as transparent overlay)
+    lam = np.asarray(sheep_cwt["dominant_wavelength_m"].data, dtype=np.float64)
+    vmin_l = float(np.nanpercentile(lam, 2))
+    vmax_l = float(np.nanpercentile(lam, 98))
+    ax_lam.imshow(sheep_hs.data, cmap="gray", extent=ext_s, origin="upper")
+    rgba_l = _rgba_overlay_from_values(lam, "viridis", vmin_l, vmax_l, zero_is_white=False)
+    ax_lam.imshow(rgba_l, extent=ext_s, origin="upper")
+    sm_l = plt.cm.ScalarMappable(cmap="viridis", norm=plt.Normalize(vmin_l, vmax_l))
+    sm_l.set_array([])
+    fig.colorbar(sm_l, ax=ax_lam, fraction=0.046, pad=0.04, label="Wavelength λ (m)")
+    ax_lam.set_title("(e) Dominant wavelength λ_dom on hillshade", fontweight="bold", pad=8)
+    ax_lam.set_xlabel("UTM Easting (km, Zone 12N)")
+    ax_lam.set_ylabel("UTM Northing (km)")
+
+    for a in (ax_a, ax_b, ax_c, ax_lam):
         plotting.use_plain_axes(a)
 
     fig.suptitle(
-        "pyGeoMapper — Rust 2D Mexican-hat CWT and multiscale topographic complexity",
+        "pyGeoMapper — Rust 2D Mexican-hat CWT and multiscale topographic complexity (Sheep Mountain)",
         fontsize=12,
         fontweight="bold",
-        y=1.02,
+        y=1.01,
     )
     out = IMG / "cwt_multiscale.png"
     plotting.save_figure(fig, out, max_width_px=1400, palette=True)
+    return out
+
+
+def regenerate_oso_landslide() -> Path:
+    """Dedicated Oso README figure: pre/post DEM+imagery drapes and DoD.
+
+    InSAR around the March 2014 failure is not in the package (Sentinel-1 launched after;
+    available ALOS/UAVSAR pairs are pre-creep or 2020–21, not co-event with these DEMs),
+    so this ships panels (a)–(c) only.
+    """
+    from pygeomapper import surface_change
+
+    dem_pre = raster_io.load_geotiff(DATA / "oso_dem_pre_cop30.tif")
+    dem_post = raster_io.load_geotiff(DATA / "oso_dem_post_3dep.tif")
+    s2_post = raster_io.load_multiband_geotiff(
+        DATA / "oso_s2_20170826.tif",
+        band_names=["blue", "green", "red", "nir", "swir1", "swir2"],
+    )
+    naip_path = DATA / "oso_naip_20130910.tif"
+    if naip_path.is_file():
+        naip = raster_io.load_multiband_geotiff(
+            naip_path, band_names=["red", "green", "blue"]
+        )
+        pre_rgb = np.stack(
+            [naip.band("red").data, naip.band("green").data, naip.band("blue").data],
+            axis=-1,
+        ).astype(np.float64)
+        if np.nanmax(pre_rgb) > 1.5:
+            pre_rgb = pre_rgb / 255.0
+        pre_rgb = np.clip(pre_rgb, 0.0, 1.0)
+        pre_photo_note = "USDA NAIP 2013-09-10"
+    else:
+        # Fallback only if NAIP tile missing: do not invent imagery.
+        pre_rgb = None
+        pre_photo_note = "hillshade only (no pre-2014 optical tile)"
+
+    hs_pre = terrain_analysis.compute_hillshade(dem_pre)
+    hs_post = terrain_analysis.compute_hillshade(dem_post)
+    raw_dod = surface_change.compute_dod(dem_pre, dem_post)
+    stable = np.abs(raw_dod["raw_dod"].data) < 4.0
+    dod_res = surface_change.compute_dod(dem_pre, dem_post, detrend_stable_mask=stable)
+    dod = dod_res["dod"]
+    vol = surface_change.compute_volume_budget(dod, lod_threshold=2.0)
+
+    ext = [
+        dem_post.bounds[0] / 1e3,
+        dem_post.bounds[2] / 1e3,
+        dem_post.bounds[1] / 1e3,
+        dem_post.bounds[3] / 1e3,
+    ]
+    post_rgb = _make_s2_rgb(s2_post)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15.5, 5.0), layout="constrained")
+    fig.suptitle(
+        "2014 Oso landslide (WA) — pre/post DEM drapes and DEM of Difference",
+        fontsize=12.5,
+        fontweight="bold",
+    )
+
+    axes[0].imshow(hs_pre.data, cmap="gray", extent=ext, origin="upper")
+    if pre_rgb is not None:
+        axes[0].imshow(pre_rgb, alpha=0.40, extent=ext, origin="upper")
+    axes[0].set_title(
+        f"(a) Pre-slide DEM (COP30 2011–13)\n+ {pre_photo_note} (α=0.4)",
+        fontweight="bold",
+        fontsize=10,
+    )
+
+    axes[1].imshow(hs_post.data, cmap="gray", extent=ext, origin="upper")
+    axes[1].imshow(post_rgb, alpha=0.40, extent=ext, origin="upper")
+    axes[1].set_title(
+        "(b) Post-slide DEM (3DEP LiDAR)\n+ Sentinel-2 2017-08-26 RGB (α=0.4)",
+        fontweight="bold",
+        fontsize=10,
+    )
+
+    axes[2].imshow(hs_post.data, cmap="gray", extent=ext, origin="upper")
+    dod_masked = np.ma.masked_inside(dod.data, -2.0, 2.0)
+    im = axes[2].imshow(
+        dod_masked, cmap=plotting.DOD_CMAP, vmin=-45.0, vmax=45.0, alpha=0.88, extent=ext, origin="upper"
+    )
+    axes[2].set_title(
+        f"(c) DoD (red = erosion, blue = deposit)\n"
+        f"eroded {vol['eroded_volume_m3']/1e6:.2f} Mm³ | deposited {vol['deposited_volume_m3']/1e6:.2f} Mm³",
+        fontweight="bold",
+        fontsize=10,
+    )
+    cb = fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+    cb.set_label(plotting.DOD_LABEL)
+
+    for ax in axes:
+        ax.set_xlabel("UTM Easting (km, Zone 10N)")
+        ax.set_ylabel("UTM Northing (km)")
+        plotting.use_plain_axes(ax)
+
+    fig.text(
+        0.5,
+        -0.02,
+        "No co-event InSAR shipped: Sentinel-1 launched after 22 Mar 2014; package has no ALOS/UAVSAR "
+        "pair spanning this pre/post DEM pair. Panels (a)–(c) only.",
+        ha="center",
+        fontsize=8,
+        style="italic",
+    )
+
+    out = IMG / "oso_landslide_dod.png"
+    plotting.save_figure(fig, out, max_width_px=1600, palette=True)
+    # Supersede the old Oso complexity-only board.
+    old = IMG / "oso_cwt_change.png"
+    if old.exists():
+        old.unlink()
     return out
 
 
@@ -541,11 +699,13 @@ def regenerate_case1a() -> Path:
 def main() -> None:
     t0 = time.perf_counter()
     outs = []
-    print("=== CWT six-panel ===")
+    print("=== CWT Sheep Mountain board ===")
     outs.append(regenerate_cwt_multiscale())
+    print("=== Oso landslide DoD board ===")
+    outs.append(regenerate_oso_landslide())
     print("=== cross-section ===")
     outs.append(regenerate_cross_section())
-    print("=== 3D A–A′ comparison ===")
+    print("=== 3D A–A′ / B–B′ ===")
     outs.extend(regenerate_3d_block())
     print("=== Case 1A LiCSAR 4-panel ===")
     outs.append(regenerate_case1a())
