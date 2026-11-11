@@ -27,6 +27,13 @@ pyGeoMapper can read, analyze, and visualize:
 
 ```bash
 pip install pygeomapper
+```
+or from `conda-forge` repository with `conda`:
+```bash
+conda install pygeomapper
+```
+
+```bash
 # from source (Python 3.10+, Rust 1.75+):
 git clone https://github.com/GeoLarryLai/pyGeoMapper.git && cd pyGeoMapper
 pip install maturin && maturin develop --release
