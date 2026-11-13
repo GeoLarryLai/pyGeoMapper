@@ -120,4 +120,8 @@ dod = surface_change.compute_dod(dem1, dem2)                        # elevation 
 cwt = terrain_analysis.compute_multiscale_complexity(dem2)          # terrain roughness at several scales
 ```
 
+## License
+
+Code: **AGPL-3.0-or-later**. You are free to use, modify, and share it; anyone distributing modified code or running a modified version as a network service must share its source under the same license.
+
 Third-party notices and data credits: [`NOTICE`](NOTICE).

@@ -26,4 +26,6 @@ Install with `pip install pygeomapper` (Python 3.10+). Figures, tutorials, and n
 
 Lai, L. S.-H. (2026). pyGeoMapper (version 0.3.0) [Computer software]. [https://doi.org/10.5281/zenodo.23832020](https://doi.org/10.5281/zenodo.23832020)
 
-License: AGPL-3.0-or-later. Third-party notices and data credits are in `NOTICE` in the repository.
+License: AGPL-3.0-or-later. You are free to use, modify, and share it; anyone distributing modified code or running a modified version as a network service must share its source under the same license.
+
+Third-party notices and data credits are in `NOTICE` in the repository.
